@@ -1,0 +1,22 @@
+body {
+    color:#FFF;
+    background-color:#2E2E2D;
+}
+.chkContainer {
+    margin-bottom:1rem;
+}
+.textAlignCenter {
+    text-align:center;
+}
+.selectAndSubmit :is(select, button) {
+    padding:0.5rem 1rem;
+    margin:0 0.5rem;
+    width:8rem;
+    border:0;
+    background-color:#EEA02D;
+    text-align:center;
+}
+option:hover,
+option:active {
+    background-color:red;
+}
