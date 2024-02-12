@@ -4,6 +4,10 @@ const JSON_FILE = 'json';
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
+let fetchAttempts = 0;
+let fetchSuccess = false;
+let previousListLength = null;
+
 document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){
     const el = document.createElement(element);
     if (Array.isArray(classes)) {
@@ -28,13 +32,13 @@ document.createElementTree = function(element,classes = [],attributes = null, ch
 };
 
 const handleStackingTitles = (e) => {
-    browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
-        browser.tabs.sendMessage(tabs[0].id,{repositionTitles:e.target.checked},(response)=>{
-            setTimeout(()=>{
+    const header = document.getElementById('header');
+    const checked = e.target.checked;
+    if (fetchAttempts < 10) {
+        browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
+            browser.tabs.sendMessage(tabs[0].id,{type: 'stackTitles',repositionTitles:checked},(response)=>{
                 browser.storage.local.get().then((data) => {
-                    const header = document.getElementById('header');
-                    let titles = data.titles;
-                    titles = JSON.parse(titles);
+                    let titles = JSON.parse(data.titles);
                     if (titles.length > 0) {
                         header.textContent = `${titles.length} item(s) found!`;
                         document.getElementById('save').remove();
@@ -44,12 +48,34 @@ const handleStackingTitles = (e) => {
                     } else {
                         header.textContent = 'No items found.'
                     }
+                    if ((!checked) || typeof previousListLength === 'number' && titles.length === previousListLength) {
+                        fetchSuccess = true;
+                        previousListLength = null;
+                    }
+                    else {
+                        fetchAttempts++;
+                        previousListLength = titles.length;
+                        if (!fetchSuccess) {
+                            setTimeout(()=>{
+                                handleStackingTitles(e);
+                            },250);
+                        }
+                    }
                 }).catch(err=>{
-                    header.textContent = `Error: Refresh the page and try again!`;
+                    fetchAttempts++;
+                    if (!fetchSuccess) {
+                        setTimeout(()=>{
+                            handleStackingTitles(e);
+                        },250);
+                    }
                 })
-            },2250);
+            });
+            
         });
-    });
+    }
+    else if (fetchAttempts === 10 && !fetchSuccess) {
+        header.textContent = `Error: Refresh the page and try again!`;
+    }
 }
 
 const createDownloadButton = () => {
@@ -184,13 +210,12 @@ const downloadFileHandler = (titles) => async (e) => {
     anchor.click();
 }
 
-const load = () => {
+const getTitles = () => {
+    const header = document.getElementById('header');
     browser.storage.local.get().then((data) => {
         const successContainer = document.getElementById('successContainer')
         if (successContainer) successContainer.remove();
-        const header = document.getElementById('header');
-        let titles = data.titles;
-        titles = JSON.parse(titles);
+        let titles = JSON.parse(data.titles);
         if (titles.length > 0) {
             header.textContent = `${titles.length} item(s) found!`;
             createDownloadButton();
@@ -204,6 +229,16 @@ const load = () => {
     })
 }
 
+const load = () => {
+    browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
+        browser.tabs.sendMessage(tabs[0].id,{type:'updateList'},(response)=>{
+            setTimeout(()=>{
+                getTitles();
+            },250);
+        });
+    });
+}
+
 ;(function main(){
-    setTimeout(load,500);
+    load();
 })();

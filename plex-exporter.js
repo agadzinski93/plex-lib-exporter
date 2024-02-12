@@ -1,6 +1,8 @@
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
+let observerAdded = false;
+
 const insertTvShow = (list, entry) => {
 	list.push(new Object({
 		title:entry.children[0].children[0].textContent,
@@ -83,93 +85,128 @@ const getMediaType = (entry) => {
 	return output;
 }
 
-const updateList = () => {
-	browser.storage.local.remove('titles');
-	const elements = document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
-	let mediaType = getMediaType(elements[0]);
-	let list = new Array();
-	for (const el of elements) {
-		if (mediaType === MOVIE) {
-			insertMovie(list, el);
-		}
-		else if (mediaType === TV_SHOW) {
-			insertTvShow(list, el);
-		}
-		
-	}
-	browser.storage.local.set({'titles':JSON.stringify(list)})
-		.then(r=>{})
-		.catch(err=>console.error(`Error: ${err}`));
+const clearStorage = async () => {
+	await browser.storage.local.remove('titles');
+}
 
-	//Observer Stuff
+const addObserverMutation = () => {
 	const targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div');
 	const config = {childList:true};
 	let prevLastElement = null;
 	const callback = (mutationList, observer) => {
 		for (const mutation of mutationList) {
 			if (mutation.type === 'childList') {
-				const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
-
-				if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-					for (const cell of cells) {
-						if (!entryExists(list,cell, mediaType)) {
-							if (mediaType === MOVIE) {
-								insertMovie(list, cell);
+				browser.storage.local.get().then(({titles}) => {
+					let list = JSON.parse(titles);
+					let mediaType = getMediaType(list[0]);
+					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
+					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+						for (const cell of cells) {
+							if (!entryExists(list,cell, mediaType)) {
+								if (mediaType === MOVIE) {
+									insertMovie(list, cell);
+								}
+								else if (mediaType === TV_SHOW) {
+									insertTvShow(list, cell);
+								}
+								browser.storage.local.set({'titles':JSON.stringify(list)})
+									.then(r=>{})
+									.catch(err=>console.error(`Error: ${err}`));
 							}
-							else if (mediaType === TV_SHOW) {
-								insertTvShow(list, cell);
-							}
-							browser.storage.local.set({'titles':JSON.stringify(list)})
-								.then(r=>{})
-								.catch(err=>console.error(`Error: ${err}`));
-						};
+						}
 					}
-				}
-				prevLastElement = cells[cells.length-1];
+					prevLastElement = cells[cells.length-1];
+				}).catch(err=>{})
 			}
 		}
 	}
 	const observer = new MutationObserver(callback);
 	observer.observe(targetNode, config);
-	return list;
+}
+
+const updateList = async () => {
+	let list = Array();
+	const elements = document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
+	let mediaType = getMediaType(elements[0]);
+	return await browser.storage.local.get().then(({titles}) => {
+		if (titles) list = JSON.parse(titles);
+		for (const el of elements) {
+			if (!entryExists(list,el,mediaType)) {
+				if (mediaType === MOVIE) {
+					insertMovie(list, el);
+				}
+				else if (mediaType === TV_SHOW) {
+					insertTvShow(list, el);
+				}
+			}
+		}
+		return browser.storage.local.set({'titles':JSON.stringify(list)})
+			.then(r=>{return list})
+			.catch(err=>console.error(`Error: ${err}`));
+	}).catch(err=>{})
 }
 
 const repositionTitles = () => {
 	const css = '[class^=ListRow] {top:0 !important; left:0 !important}';
 	document.getElementById('tempStyles').textContent = css;
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.removeProperty('display');
-	return updateList();
 }
 
 const revertTitles = () => {
 	document.getElementById('tempStyles').textContent = '';
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.display = 'contents';
-	return updateList();
 }
 
-const initialUpdateList = () => {
+const createStylesheet = () => {
 	if (!document.getElementById('tempStyles')) {
-		const head = document.head || document.getElementsByTagName('head')[0];
 		const stylesheet = document.createElement('style');
 		stylesheet.setAttribute('rel','stylesheet');
 		stylesheet.setAttribute('id','tempStyles');
 		document.getElementsByTagName('head')[0].append(stylesheet);
 	}
-	setTimeout(()=>{
-		updateList();
-	},1250);
 }
 
-const editTitleLayoutHandler = (data, sender) => {
-	browser.storage.local.remove('titles');
-	const list = (data.repositionTitles) ? repositionTitles() : revertTitles();
-	browser.storage.local.set({'titles':JSON.stringify(list)})
-		.then(r=>{})
-		.catch(err=>console.error(`Error: ${err}`));
-	return Promise.resolve(data.repositionTitles);
+const awaitUpdate = delay => new Promise((resolve, reject)=>{
+	setTimeout(async ()=>{
+		const res = await updateList();
+		console.log(res.length);
+		resolve(true);
+	},delay);
+});
+
+const messageHandler = async (data, sender) => {
+	switch(data.type) {
+		case 'updateList':
+			if (!observerAdded) {
+				observerAdded = true;
+				addObserverMutation();
+			}
+			createStylesheet();
+			await updateList();
+			break;
+		case 'stackTitles':
+			await clearStorage();
+			if (data.repositionTitles) {
+				repositionTitles();
+			}
+			else {
+				revertTitles();
+			}
+			await awaitUpdate(250);
+			break;
+		default:
+	}
+	return Promise.resolve(data.type);
+}
+
+const init = () => {
+	clearStorage();
+	createStylesheet();
+	updateList();
 }
 
 ;(function init(){
-	browser.runtime.onMessage.addListener(editTitleLayoutHandler);
-	window.addEventListener('hashchange',initialUpdateList);
+	clearStorage();
+	browser.runtime.onMessage.addListener(messageHandler);
+	window.addEventListener('hashchange',init);
 })();
