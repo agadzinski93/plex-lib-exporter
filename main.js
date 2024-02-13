@@ -31,6 +31,23 @@ document.createElementTree = function(element,classes = [],attributes = null, ch
     return el;
 };
 
+const updateDownloadButton = () => {
+    browser.storage.local.get().then((data) => {
+        let titles = JSON.parse(data.titles);
+        if (titles.length > 0) {
+            header.textContent = `${titles.length} item(s) found!`;
+            document.getElementById('save').remove();
+            document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+            const handleDownload = downloadFileHandler(titles);
+            document.getElementById('save').addEventListener('click',handleDownload);
+        } else {
+            header.textContent = 'No items found.'
+        }
+    }).catch(err=>{
+        console.error(`Error: ${err.message}`);
+    })
+}
+
 const handleStackingTitles = (e) => {
     const header = document.getElementById('header');
     const checked = e.target.checked;
@@ -196,7 +213,6 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
             break;
         default:
     }
-    
     return output;
 }
 
@@ -241,4 +257,5 @@ const load = () => {
 
 ;(function main(){
     load();
+    browser.runtime.onMessage.addListener(updateDownloadButton);
 })();

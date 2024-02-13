@@ -98,8 +98,8 @@ const addObserverMutation = () => {
 			if (mutation.type === 'childList') {
 				browser.storage.local.get().then(({titles}) => {
 					let list = JSON.parse(titles);
-					let mediaType = getMediaType(list[0]);
 					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
+					let mediaType = getMediaType(cells[0]);
 					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
 						for (const cell of cells) {
 							if (!entryExists(list,cell, mediaType)) {
@@ -110,13 +110,15 @@ const addObserverMutation = () => {
 									insertTvShow(list, cell);
 								}
 								browser.storage.local.set({'titles':JSON.stringify(list)})
-									.then(r=>{})
+									.then(r=>{
+										browser.runtime.sendMessage({updateTitles:true},(response)=>{});
+									})
 									.catch(err=>console.error(`Error: ${err}`));
 							}
 						}
 					}
 					prevLastElement = cells[cells.length-1];
-				}).catch(err=>{})
+				}).catch(err=>{console.error(err.message)})
 			}
 		}
 	}
@@ -169,8 +171,12 @@ const createStylesheet = () => {
 const awaitUpdate = delay => new Promise((resolve, reject)=>{
 	setTimeout(async ()=>{
 		const res = await updateList();
-		console.log(res.length);
-		resolve(true);
+		if (Array.isArray(res)) {
+			resolve(true);
+		}
+		else {
+			reject(false);
+		}
 	},delay);
 });
 
@@ -199,13 +205,16 @@ const messageHandler = async (data, sender) => {
 	return Promise.resolve(data.type);
 }
 
-const init = () => {
+const init = async () => {
+	observerAdded = false;
 	clearStorage();
 	createStylesheet();
-	updateList();
+	addObserverMutation();
+	await updateList();
 }
 
 ;(function init(){
+	observerAdded = false;
 	clearStorage();
 	browser.runtime.onMessage.addListener(messageHandler);
 	window.addEventListener('hashchange',init);
