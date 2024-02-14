@@ -181,7 +181,21 @@ const awaitUpdate = delay => new Promise((resolve, reject)=>{
 });
 
 const messageHandler = async (data, sender) => {
+	let response = null;
 	switch(data.type) {
+		case 'verifyDomain':
+			const localhostIp = /127\.0\.0\.1/;
+			const localhost = /localhost/;
+			const plexUrl = /app\.plex\.tv\//;
+			const url = location.href;
+			console.log(url);
+			if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
+				response = true;
+			}
+			else {
+				response = false;
+			}
+			break;
 		case 'updateList':
 			if (!observerAdded) {
 				observerAdded = true;
@@ -202,7 +216,7 @@ const messageHandler = async (data, sender) => {
 			break;
 		default:
 	}
-	return Promise.resolve(data.type);
+	return Promise.resolve(response);
 }
 
 const init = async () => {

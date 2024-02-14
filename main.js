@@ -255,7 +255,20 @@ const load = () => {
     });
 }
 
+const verifyDomain = () => {
+    browser.tabs.query({active:true,currentWindow:true},async (tabs)=>{
+        browser.tabs.sendMessage(tabs[0].id,{type:'verifyDomain'},(response)=>{
+            if (response) {
+                load();
+                browser.runtime.onMessage.addListener(updateDownloadButton);
+            }
+            else {
+                document.getElementById('header').textContent = `Unsupported URL. Make sure you're on localhost, 127.0.0.1, or app.plex.tv`;
+            }
+        });
+    });
+}
+
 ;(function main(){
-    load();
-    browser.runtime.onMessage.addListener(updateDownloadButton);
+    verifyDomain();
 })();

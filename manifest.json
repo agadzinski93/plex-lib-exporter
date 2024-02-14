@@ -5,7 +5,7 @@
 	"description":"Allows users to export their Plex libraries into text files.",
 	"content_scripts": [
 		{
-		  "matches": ["*://localhost/*","*://www.plex.tv/*", "*://127.0.0.1/*"],
+		  "matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
 		  "js": ["plex-exporter.js"]
 		}
 	],
