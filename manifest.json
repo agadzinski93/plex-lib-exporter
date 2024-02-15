@@ -1,8 +1,11 @@
 {
-	"manifest_version":2,
+	"manifest_version":3,
 	"name":"Plex Library Exporter",
 	"version":"0.1.0",
 	"description":"Allows users to export their Plex libraries into text files.",
+	"background":{
+		"scripts":["background.js"]
+	},
 	"content_scripts": [
 		{
 		  "matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
@@ -10,11 +13,12 @@
 		}
 	],
 	"permissions": [
-		"storage"
+		"storage",
+		"tabs"
 	  ],
-	"browser_action":{
+	"action":{
 		"default_icon":"star.png",
-		"default_title":"Plex Exporter",
+		"default_title":"Plex Library Exporter",
 		"default_popup":"view.html"
 	}
 }

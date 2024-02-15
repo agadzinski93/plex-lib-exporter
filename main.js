@@ -4,9 +4,16 @@ const JSON_FILE = 'json';
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
+const {GET_STORAGE,SET_STORAGE} = {
+    GET_STORAGE:'GET_STORAGE',
+    SET_STORAGE:'SET_STORAGE',
+    REMOVE_STORAGE:'REMOVE_STORAGE'
+}
+
 let fetchAttempts = 0;
 let fetchSuccess = false;
 let previousListLength = null;
+let tabId = null;
 
 document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){
     const el = document.createElement(element);
@@ -32,7 +39,19 @@ document.createElementTree = function(element,classes = [],attributes = null, ch
 };
 
 const updateDownloadButton = () => {
-    browser.storage.local.get().then((data) => {
+    browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
+        let titles = JSON.parse(data);
+        if (titles.length > 0) {
+            header.textContent = `${titles.length} item(s) found!`;
+            document.getElementById('save').remove();
+            document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+            const handleDownload = downloadFileHandler(titles);
+            document.getElementById('save').addEventListener('click',handleDownload);
+        } else {
+            header.textContent = 'No items found.'
+        }
+    });
+    /* browser.storage.local.get().then((data) => {
         let titles = JSON.parse(data.titles);
         if (titles.length > 0) {
             header.textContent = `${titles.length} item(s) found!`;
@@ -45,14 +64,48 @@ const updateDownloadButton = () => {
         }
     }).catch(err=>{
         console.error(`Error: ${err.message}`);
-    })
+    }) */
 }
 
 const handleStackingTitles = (e) => {
     const header = document.getElementById('header');
     const checked = e.target.checked;
     if (fetchAttempts < 10) {
-        browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
+        browser.tabs.sendMessage(tabId,{type: 'stackTitles',repositionTitles:checked},(response)=>{
+            browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
+                let titles = JSON.parse(data);
+                if (titles.length > 0) {
+                    header.textContent = `${titles.length} item(s) found!`;
+                    document.getElementById('save').remove();
+                    document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+                    const handleDownload = downloadFileHandler(titles);
+                    document.getElementById('save').addEventListener('click',handleDownload);
+                } else {
+                    header.textContent = 'No items found.'
+                }
+                if ((!checked) || typeof previousListLength === 'number' && titles.length === previousListLength) {
+                    fetchSuccess = true;
+                    previousListLength = null;
+                }
+                else {
+                    fetchAttempts++;
+                    previousListLength = titles.length;
+                    if (!fetchSuccess) {
+                        setTimeout(()=>{
+                            handleStackingTitles(e);
+                        },250);
+                    }
+                }
+            },(err)=>{
+                fetchAttempts++;
+                if (!fetchSuccess) {
+                    setTimeout(()=>{
+                        handleStackingTitles(e);
+                    },250);
+                }
+            });
+        });
+        /* browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
             browser.tabs.sendMessage(tabs[0].id,{type: 'stackTitles',repositionTitles:checked},(response)=>{
                 browser.storage.local.get().then((data) => {
                     let titles = JSON.parse(data.titles);
@@ -88,7 +141,7 @@ const handleStackingTitles = (e) => {
                 })
             });
             
-        });
+        }); */
     }
     else if (fetchAttempts === 10 && !fetchSuccess) {
         header.textContent = `Error: Refresh the page and try again!`;
@@ -226,9 +279,26 @@ const downloadFileHandler = (titles) => async (e) => {
     anchor.click();
 }
 
-const getTitles = () => {
+const getTitles = async () => {
     const header = document.getElementById('header');
-    browser.storage.local.get().then((data) => {
+    try {
+        const data = await browser.runtime.sendMessage({type:GET_STORAGE,id:tabId});
+        const successContainer = document.getElementById('successContainer')
+        if (successContainer) successContainer.remove();
+        let titles = (data) ? JSON.parse(data): new Array();
+        if (titles.length > 0) {
+            header.textContent = `${titles.length} item(s) found!`;
+            createDownloadButton();
+            const handleDownload = downloadFileHandler(titles);
+            document.getElementById('save').addEventListener('click',handleDownload);
+        } else {
+            header.textContent = 'No items found.'
+        }
+    } catch(err) {
+        header.textContent = `Error: ${err.message}`;
+    }
+    //const data = browser.runtime.sendMessage({type:GET_STORAGE,id:tabId});
+    /* browser.storage.local.get().then((data) => {
         const successContainer = document.getElementById('successContainer')
         if (successContainer) successContainer.remove();
         let titles = JSON.parse(data.titles);
@@ -242,25 +312,25 @@ const getTitles = () => {
         }
     }).catch(err=>{
         header.textContent = `Error: ${err.message}`;
-    })
+    }) */
 }
 
 const load = () => {
     browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
-        browser.tabs.sendMessage(tabs[0].id,{type:'updateList'},(response)=>{
-            setTimeout(()=>{
-                getTitles();
+        browser.tabs.sendMessage(tabId,{type:'updateList'},(response)=>{
+            setTimeout(async ()=>{
+                await getTitles();
+                browser.runtime.onMessage.addListener(updateDownloadButton);
             },250);
         });
     });
 }
 
-const verifyDomain = () => {
-    browser.tabs.query({active:true,currentWindow:true},async (tabs)=>{
-        browser.tabs.sendMessage(tabs[0].id,{type:'verifyDomain'},(response)=>{
+const verifyDomain = async () => {
+    await browser.tabs.query({active:true,currentWindow:true},async (tabs)=>{
+        await browser.tabs.sendMessage(tabs[0].id,{type:'verifyDomain'},(response)=>{
             if (response) {
                 load();
-                browser.runtime.onMessage.addListener(updateDownloadButton);
             }
             else {
                 document.getElementById('header').textContent = `Unsupported URL. Make sure you're on localhost, 127.0.0.1, or app.plex.tv`;
@@ -269,6 +339,41 @@ const verifyDomain = () => {
     });
 }
 
+const getCurrentWindowTabs = () => {
+    return browser.tabs.query({currentWindow:true, active:true});
+}
+
+const setTabId = () => {
+    getCurrentWindowTabs().then((tabs)=>{
+        tabId = tabs[0].id;
+        browser.tabs.sendMessage(tabId,{type:'setTabIdInContent',tabId},(response)=>{
+            tabId = response;
+        });
+    })
+}
+
+const setCloseHandler = (data,sender) => {
+    switch(data.type) {
+        case 'CLOSE_POPUP':
+            window.close();
+            break;
+        default:
+    }
+}
+
 ;(function main(){
-    verifyDomain();
+    setTimeout(()=>{
+        try {
+            verifyDomain();
+            browser.runtime.onMessage.addListener(setCloseHandler);
+            if (document.readyState !== 'loading') {
+                setTabId();
+            }
+            else {
+                document.addEventListener('DOMContentLoaded',setTabId);
+            }
+        } catch(err) {
+            console.error(`Popup Error: ${err.message}`);
+        }
+    },250); 
 })();

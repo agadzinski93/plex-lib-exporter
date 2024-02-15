@@ -1,7 +1,15 @@
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP_FROM_CONTENT} = {
+    GET_STORAGE:'GET_STORAGE',
+    SET_STORAGE:'SET_STORAGE',
+    REMOVE_STORAGE:'REMOVE_STORAGE',
+	CLOSE_POPUP_FROM_CONTENT:'CLOSE_POPUP_FROM_CONTENT'
+}
+
 let observerAdded = false;
+let tabId = null;
 
 const insertTvShow = (list, entry) => {
 	list.push(new Object({
@@ -85,10 +93,6 @@ const getMediaType = (entry) => {
 	return output;
 }
 
-const clearStorage = async () => {
-	await browser.storage.local.remove('titles');
-}
-
 const addObserverMutation = () => {
 	const targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div');
 	const config = {childList:true};
@@ -96,7 +100,29 @@ const addObserverMutation = () => {
 	const callback = (mutationList, observer) => {
 		for (const mutation of mutationList) {
 			if (mutation.type === 'childList') {
-				browser.storage.local.get().then(({titles}) => {
+				//Send Message to Popup
+				browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
+					let list = JSON.parse(data);
+					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
+					let mediaType = getMediaType(cells[0]);
+					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+						for (const cell of cells) {
+							if (!entryExists(list,cell, mediaType)) {
+								if (mediaType === MOVIE) {
+									insertMovie(list, cell);
+								}
+								else if (mediaType === TV_SHOW) {
+									insertTvShow(list, cell);
+								}
+								browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(list)},(response)=>{
+
+								});
+							}
+						}
+					}
+					prevLastElement = cells[cells.length-1];
+				});
+				/* browser.storage.local.get().then(({titles}) => {
 					let list = JSON.parse(titles);
 					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
 					let mediaType = getMediaType(cells[0]);
@@ -118,7 +144,7 @@ const addObserverMutation = () => {
 						}
 					}
 					prevLastElement = cells[cells.length-1];
-				}).catch(err=>{console.error(err.message)})
+				}).catch(err=>{console.error(err.message)}) */
 			}
 		}
 	}
@@ -130,7 +156,23 @@ const updateList = async () => {
 	let list = Array();
 	const elements = document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
 	let mediaType = getMediaType(elements[0]);
-	return await browser.storage.local.get().then(({titles}) => {
+	await browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},async (data)=>{
+		if (data) list = JSON.parse(data);
+		for (const el of elements) {
+			if (!entryExists(list,el,mediaType)) {
+				if (mediaType === MOVIE) {
+					insertMovie(list, el);
+				}
+				else if (mediaType === TV_SHOW) {
+					insertTvShow(list, el);
+				}
+			}
+		}
+		await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(list)},(response)=>{
+			return list;
+		});
+	});
+	/* return await browser.storage.local.get().then(({titles}) => {
 		if (titles) list = JSON.parse(titles);
 		for (const el of elements) {
 			if (!entryExists(list,el,mediaType)) {
@@ -144,8 +186,8 @@ const updateList = async () => {
 		}
 		return browser.storage.local.set({'titles':JSON.stringify(list)})
 			.then(r=>{return list})
-			.catch(err=>console.error(`Error: ${err}`));
-	}).catch(err=>{})
+			.catch(err=>console.error(`Error 3: ${err}`));
+	}).catch(err=>{console.error('error');}) */
 }
 
 const repositionTitles = () => {
@@ -180,6 +222,14 @@ const awaitUpdate = delay => new Promise((resolve, reject)=>{
 	},delay);
 });
 
+const clearStorage = async () => {
+	try {
+		if (tabId) await browser.runtime.sendMessage({type:REMOVE_STORAGE,id:tabId});
+	} catch(err) {
+		//Popup Not Loaded
+	}
+}
+
 const messageHandler = async (data, sender) => {
 	let response = null;
 	switch(data.type) {
@@ -188,13 +238,16 @@ const messageHandler = async (data, sender) => {
 			const localhost = /localhost/;
 			const plexUrl = /app\.plex\.tv\//;
 			const url = location.href;
-			console.log(url);
 			if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
 				response = true;
 			}
 			else {
 				response = false;
 			}
+			break;
+		case 'setTabIdInContent':
+			if (!tabId) tabId = data.tabId;
+			response = tabId;
 			break;
 		case 'updateList':
 			if (!observerAdded) {
@@ -219,7 +272,16 @@ const messageHandler = async (data, sender) => {
 	return Promise.resolve(response);
 }
 
+const closePopup = async () => {
+	try {
+		await browser.runtime.sendMessage({type:CLOSE_POPUP_FROM_CONTENT});
+	} catch(err) {
+		//Popup is not open
+	}
+}
+
 const init = async () => {
+	closePopup();
 	observerAdded = false;
 	clearStorage();
 	createStylesheet();
@@ -227,9 +289,10 @@ const init = async () => {
 	await updateList();
 }
 
-;(function init(){
+;(async function init(){
+	await closePopup();
 	observerAdded = false;
-	clearStorage();
 	browser.runtime.onMessage.addListener(messageHandler);
 	window.addEventListener('hashchange',init);
+	clearStorage();
 })();
