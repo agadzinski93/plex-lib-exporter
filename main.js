@@ -51,20 +51,6 @@ const updateDownloadButton = () => {
             header.textContent = 'No items found.'
         }
     });
-    /* browser.storage.local.get().then((data) => {
-        let titles = JSON.parse(data.titles);
-        if (titles.length > 0) {
-            header.textContent = `${titles.length} item(s) found!`;
-            document.getElementById('save').remove();
-            document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
-            const handleDownload = downloadFileHandler(titles);
-            document.getElementById('save').addEventListener('click',handleDownload);
-        } else {
-            header.textContent = 'No items found.'
-        }
-    }).catch(err=>{
-        console.error(`Error: ${err.message}`);
-    }) */
 }
 
 const handleStackingTitles = (e) => {
@@ -105,50 +91,26 @@ const handleStackingTitles = (e) => {
                 }
             });
         });
-        /* browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
-            browser.tabs.sendMessage(tabs[0].id,{type: 'stackTitles',repositionTitles:checked},(response)=>{
-                browser.storage.local.get().then((data) => {
-                    let titles = JSON.parse(data.titles);
-                    if (titles.length > 0) {
-                        header.textContent = `${titles.length} item(s) found!`;
-                        document.getElementById('save').remove();
-                        document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
-                        const handleDownload = downloadFileHandler(titles);
-                        document.getElementById('save').addEventListener('click',handleDownload);
-                    } else {
-                        header.textContent = 'No items found.'
-                    }
-                    if ((!checked) || typeof previousListLength === 'number' && titles.length === previousListLength) {
-                        fetchSuccess = true;
-                        previousListLength = null;
-                    }
-                    else {
-                        fetchAttempts++;
-                        previousListLength = titles.length;
-                        if (!fetchSuccess) {
-                            setTimeout(()=>{
-                                handleStackingTitles(e);
-                            },250);
-                        }
-                    }
-                }).catch(err=>{
-                    fetchAttempts++;
-                    if (!fetchSuccess) {
-                        setTimeout(()=>{
-                            handleStackingTitles(e);
-                        },250);
-                    }
-                })
-            });
-            
-        }); */
     }
     else if (fetchAttempts === 10 && !fetchSuccess) {
         header.textContent = `Error: Refresh the page and try again!`;
     }
 }
 
-const createDownloadButton = () => {
+const chkStackTitlesChecked = async () => {
+    let output = false;
+    try {
+        const tabs = await getCurrentWindowTabs();
+        output = await browser.tabs.sendMessage(tabs[0].id,{type:'isChecked'});
+    } catch(err) {
+        console.error(`Error Verifying Stack Checkbox State`);
+    }
+    console.log(output);
+    return output;
+}
+
+const createDownloadButton = async () => {
+    const checked = await chkStackTitlesChecked();
     document.querySelector('main').append(document.createElementTree('div',['textAlignCenter'],{id:'successContainer'},[
         ['div',['chkContainer'],null,[
             ['input',null,{id:'chkStackTitles',type:'checkbox',value:'Stack Titles'},null,null],
@@ -168,6 +130,7 @@ const createDownloadButton = () => {
         ]]
     ]));
     document.getElementById('chkStackTitles').addEventListener('click',handleStackingTitles);
+    document.getElementById('chkStackTitles').checked = checked;
     if (document.getElementById('tempStyles')?.textContent) document.getElementById('chkStackTitles').checked = true;
 }
 
@@ -288,7 +251,7 @@ const getTitles = async () => {
         let titles = (data) ? JSON.parse(data): new Array();
         if (titles.length > 0) {
             header.textContent = `${titles.length} item(s) found!`;
-            createDownloadButton();
+            await createDownloadButton();
             const handleDownload = downloadFileHandler(titles);
             document.getElementById('save').addEventListener('click',handleDownload);
         } else {
@@ -297,22 +260,6 @@ const getTitles = async () => {
     } catch(err) {
         header.textContent = `Error: ${err.message}`;
     }
-    //const data = browser.runtime.sendMessage({type:GET_STORAGE,id:tabId});
-    /* browser.storage.local.get().then((data) => {
-        const successContainer = document.getElementById('successContainer')
-        if (successContainer) successContainer.remove();
-        let titles = JSON.parse(data.titles);
-        if (titles.length > 0) {
-            header.textContent = `${titles.length} item(s) found!`;
-            createDownloadButton();
-            const handleDownload = downloadFileHandler(titles);
-            document.getElementById('save').addEventListener('click',handleDownload);
-        } else {
-            header.textContent = 'No items found.'
-        }
-    }).catch(err=>{
-        header.textContent = `Error: ${err.message}`;
-    }) */
 }
 
 const load = () => {

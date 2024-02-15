@@ -10,6 +10,7 @@ const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP_FROM_CONTENT} = {
 
 let observerAdded = false;
 let tabId = null;
+let chkStackTitlesChecked = false;
 
 const insertTvShow = (list, entry) => {
 	list.push(new Object({
@@ -122,29 +123,6 @@ const addObserverMutation = () => {
 					}
 					prevLastElement = cells[cells.length-1];
 				});
-				/* browser.storage.local.get().then(({titles}) => {
-					let list = JSON.parse(titles);
-					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
-					let mediaType = getMediaType(cells[0]);
-					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-						for (const cell of cells) {
-							if (!entryExists(list,cell, mediaType)) {
-								if (mediaType === MOVIE) {
-									insertMovie(list, cell);
-								}
-								else if (mediaType === TV_SHOW) {
-									insertTvShow(list, cell);
-								}
-								browser.storage.local.set({'titles':JSON.stringify(list)})
-									.then(r=>{
-										browser.runtime.sendMessage({updateTitles:true},(response)=>{});
-									})
-									.catch(err=>console.error(`Error: ${err}`));
-							}
-						}
-					}
-					prevLastElement = cells[cells.length-1];
-				}).catch(err=>{console.error(err.message)}) */
 			}
 		}
 	}
@@ -172,33 +150,19 @@ const updateList = async () => {
 			return list;
 		});
 	});
-	/* return await browser.storage.local.get().then(({titles}) => {
-		if (titles) list = JSON.parse(titles);
-		for (const el of elements) {
-			if (!entryExists(list,el,mediaType)) {
-				if (mediaType === MOVIE) {
-					insertMovie(list, el);
-				}
-				else if (mediaType === TV_SHOW) {
-					insertTvShow(list, el);
-				}
-			}
-		}
-		return browser.storage.local.set({'titles':JSON.stringify(list)})
-			.then(r=>{return list})
-			.catch(err=>console.error(`Error 3: ${err}`));
-	}).catch(err=>{console.error('error');}) */
 }
 
 const repositionTitles = () => {
 	const css = '[class^=ListRow] {top:0 !important; left:0 !important}';
 	document.getElementById('tempStyles').textContent = css;
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.removeProperty('display');
+	chkStackTitlesChecked = true;
 }
 
 const revertTitles = () => {
 	document.getElementById('tempStyles').textContent = '';
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.display = 'contents';
+	chkStackTitlesChecked = false;
 }
 
 const createStylesheet = () => {
@@ -266,6 +230,9 @@ const messageHandler = async (data, sender) => {
 				revertTitles();
 			}
 			await awaitUpdate(250);
+			break;
+		case 'isChecked':
+			response = chkStackTitlesChecked;
 			break;
 		default:
 	}
