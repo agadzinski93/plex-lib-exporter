@@ -4,10 +4,12 @@ const JSON_FILE = 'json';
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
-const {GET_STORAGE,SET_STORAGE} = {
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON} = {
     GET_STORAGE:'GET_STORAGE',
     SET_STORAGE:'SET_STORAGE',
-    REMOVE_STORAGE:'REMOVE_STORAGE'
+    REMOVE_STORAGE:'REMOVE_STORAGE',
+    CLOSE_POPUP:'CLOSE_POPUP',
+    UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON'
 }
 
 let fetchAttempts = 0;
@@ -38,8 +40,11 @@ document.createElementTree = function(element,classes = [],attributes = null, ch
     return el;
 };
 
-const updateDownloadButton = () => {
-    browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
+const updateDownloadButton = async () => {
+    let output = false;
+    const header = document.getElementById('header');
+    try {
+        const data = await getStorage(tabId);
         let titles = JSON.parse(data);
         if (titles.length > 0) {
             header.textContent = `${titles.length} item(s) found!`;
@@ -50,51 +55,56 @@ const updateDownloadButton = () => {
         } else {
             header.textContent = 'No items found.'
         }
-    });
+        output = true;
+    } catch(err) {
+        header.textContent = 'An error occurred.'
+    }
+    return output;
 }
 
-const handleStackingTitles = (e) => {
+const waitForTilesToLoad = (delay, numOfTitles) => new Promise((resolve, reject)=>{
+	setTimeout(async ()=>{
+		try {
+            const data = await getStorage(tabId);
+            let titles = JSON.parse(data);
+            if (titles.length === numOfTitles || fetchAttempts === 0) {
+                header.textContent = `${titles.length} item(s) found!`;
+                document.getElementById('save').remove();
+                document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+                const handleDownload = downloadFileHandler(titles);
+                document.getElementById('save').addEventListener('click',handleDownload);
+                resolve(true);
+            } else if (titles.length === 0) {
+                header.textContent = 'No items found.'
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        } catch(err) {
+            reject(err);
+        }
+	},delay);
+});
+
+const handleStackingTitles = async (e) => {
+    fetchAttempts = 0;
+    fetchSuccess = false;
     const header = document.getElementById('header');
     const checked = e.target.checked;
-    if (fetchAttempts < 10) {
-        browser.tabs.sendMessage(tabId,{type: 'stackTitles',repositionTitles:checked},(response)=>{
-            browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
-                let titles = JSON.parse(data);
-                if (titles.length > 0) {
-                    header.textContent = `${titles.length} item(s) found!`;
-                    document.getElementById('save').remove();
-                    document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
-                    const handleDownload = downloadFileHandler(titles);
-                    document.getElementById('save').addEventListener('click',handleDownload);
-                } else {
-                    header.textContent = 'No items found.'
-                }
-                if ((!checked) || typeof previousListLength === 'number' && titles.length === previousListLength) {
-                    fetchSuccess = true;
-                    previousListLength = null;
-                }
-                else {
-                    fetchAttempts++;
-                    previousListLength = titles.length;
-                    if (!fetchSuccess) {
-                        setTimeout(()=>{
-                            handleStackingTitles(e);
-                        },250);
-                    }
-                }
-            },(err)=>{
-                fetchAttempts++;
-                if (!fetchSuccess) {
-                    setTimeout(()=>{
-                        handleStackingTitles(e);
-                    },250);
-                }
-            });
-        });
-    }
-    else if (fetchAttempts === 10 && !fetchSuccess) {
-        header.textContent = `Error: Refresh the page and try again!`;
-    }
+    const numOfTitles = await browser.tabs.sendMessage(tabId,{type: 'stackTitles',repositionTitles:checked});
+    let done = false;
+    do {
+        fetchAttempts++;
+        try {
+            done = await waitForTilesToLoad(250,numOfTitles);
+            if (!checked) done = true;
+            //console.log(`Fetch #:${fetchAttempts} | Done: ${done} | Num of Titles: ${numOfTitles}`);
+        } catch(err) {
+            console.error(`Error Stacking Titles: ${err.message}`);
+            header.textContent = `Error: Refresh the page and try again!`;
+            done = true;
+        }
+    } while(!done && fetchAttempts < 25);
 }
 
 const chkStackTitlesChecked = async () => {
@@ -105,7 +115,6 @@ const chkStackTitlesChecked = async () => {
     } catch(err) {
         console.error(`Error Verifying Stack Checkbox State`);
     }
-    console.log(output);
     return output;
 }
 
@@ -245,7 +254,7 @@ const downloadFileHandler = (titles) => async (e) => {
 const getTitles = async () => {
     const header = document.getElementById('header');
     try {
-        const data = await browser.runtime.sendMessage({type:GET_STORAGE,id:tabId});
+        const data = await getStorage(tabId);
         const successContainer = document.getElementById('successContainer')
         if (successContainer) successContainer.remove();
         let titles = (data) ? JSON.parse(data): new Array();
@@ -262,65 +271,131 @@ const getTitles = async () => {
     }
 }
 
-const load = () => {
-    browser.tabs.query({active:true,currentWindow:true},(tabs)=>{
-        browser.tabs.sendMessage(tabId,{type:'updateList'},(response)=>{
-            setTimeout(async ()=>{
-                await getTitles();
-                browser.runtime.onMessage.addListener(updateDownloadButton);
-            },250);
-        });
-    });
-}
-
-const verifyDomain = async () => {
-    await browser.tabs.query({active:true,currentWindow:true},async (tabs)=>{
-        await browser.tabs.sendMessage(tabs[0].id,{type:'verifyDomain'},(response)=>{
-            if (response) {
-                load();
-            }
-            else {
-                document.getElementById('header').textContent = `Unsupported URL. Make sure you're on localhost, 127.0.0.1, or app.plex.tv`;
-            }
-        });
-    });
-}
-
-const getCurrentWindowTabs = () => {
-    return browser.tabs.query({currentWindow:true, active:true});
-}
-
-const setTabId = () => {
-    getCurrentWindowTabs().then((tabs)=>{
-        tabId = tabs[0].id;
-        browser.tabs.sendMessage(tabId,{type:'setTabIdInContent',tabId},(response)=>{
-            tabId = response;
-        });
-    })
-}
-
-const setCloseHandler = (data,sender) => {
-    switch(data.type) {
-        case 'CLOSE_POPUP':
-            window.close();
-            break;
-        default:
+const load = async () => {
+    try {
+        if (!tabId) {
+            const tabs = await browser.tabs.query({currentWindow:true,active:true});
+            tabId = tabs[0].id
+        }
+        await browser.tabs.sendMessage(tabId,{type:'updateList'});
+        await browser.tabs.sendMessage(tabId,{type:'updateStorage'});
+        setTimeout(async ()=>{
+            await getTitles();
+            await updateDownloadButton();
+        },250);
+    } catch(err) {
+        console.error(`Error Loading Popup: ${err.message}`);
     }
 }
 
-;(function main(){
-    setTimeout(()=>{
-        try {
-            verifyDomain();
-            browser.runtime.onMessage.addListener(setCloseHandler);
-            if (document.readyState !== 'loading') {
-                setTabId();
+const getCurrentWindowTabs = async () => {
+    return await browser.tabs.query({currentWindow:true, active:true});
+}
+
+const setTabId = async () => {
+    try {
+        const tabs = await getCurrentWindowTabs();
+        tabId = tabs[0].id;
+        tabId = await browser.tabs.sendMessage(tabId,{type:'setTabIdInContent',tabId});
+    } catch(err) {
+        console.error(`Error Getting/Setting Tab ID: ${err.message}`);
+    }
+}
+
+const pageChanged = async () => {
+    return await browser.tabs.sendMessage(tabId,{type:'PAGE_CHANGED'});
+}
+
+const verifyDomain = async () => {
+    let response = false;
+    try {
+        const tabs = await browser.tabs.query({active:true,currentWindow:true});
+        const url = tabs[0].url;
+        const localhostIp = /127\.0\.0\.1/;
+        const localhost = /localhost/;
+        const plexUrl = /app\.plex\.tv\//;
+        if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
+            response = true;
+            await setTabId();
+            if (await pageChanged()) {
+                removeStorage(tabId);
             }
-            else {
-                document.addEventListener('DOMContentLoaded',setTabId);
-            }
-        } catch(err) {
-            console.error(`Popup Error: ${err.message}`);
+            await load();
         }
-    },250); 
+        else {
+            document.getElementById('header').textContent = `Unsupported URL. Make sure you're on localhost, 127.0.0.1, or app.plex.tv`;
+        }
+    } catch(err) {
+        console.error(`Error verifying domain: ${err.message}`);
+    }
+}
+
+const getStorage = async (id) => {
+    let output = "";
+    try {
+        const data = await browser.storage.session.get();
+        if (data[`${id}`]) output = data[`${id}`];
+    } catch(err) {
+        console.error(`Background Error Getting Storage: ${err.message}`);
+        output = null;
+    }
+    return output;
+}
+const setStorage = async (id, data) => {
+    let success = false;
+    try {
+        const obj = {};
+        obj[`${id}`] = data;
+        await browser.storage.session.set(obj);
+        success = true;
+    } catch(err) {
+        console.error(`Background Error Setting Storage: ${err.message}`);
+    }
+    return success;
+}
+const removeStorage = async (id) => {
+    await browser.storage.session.remove(`${id}`);
+}
+
+const communicationHandler = async (data, sender) => {
+    let output = false;
+    try {
+        switch(data.type){
+            case GET_STORAGE:
+                output = await getStorage(data.id);
+                break;
+            case SET_STORAGE:
+                output = await setStorage(data.id,data.data);
+                break;
+            case REMOVE_STORAGE:
+                await removeStorage(data.id);
+                break;
+            case CLOSE_POPUP:
+                window.close();
+                break;
+            case UPDATE_DOWNLOAD_BUTTON:
+                output = await updateDownloadButton();
+                break;
+            default:
+        }
+    } catch(err) {
+        console.error(`Error with Storage: ${err.message}`);
+    }
+    if (output || typeof output === 'string') {
+        //Works with Popup Closed...
+        return Promise.resolve(output);
+    }
+    else {
+        return Promise.reject(output);
+    }
+}
+;(async function main(){
+    browser.runtime.onMessage.addListener(communicationHandler);
+        setTimeout(async ()=>{
+            try {
+                await verifyDomain();
+            } catch(err) {
+                console.error(`Popup Init Error: ${err.message}`);
+            }
+        },250); 
 })();

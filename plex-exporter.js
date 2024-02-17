@@ -1,16 +1,19 @@
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
-const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP_FROM_CONTENT} = {
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON} = {
     GET_STORAGE:'GET_STORAGE',
     SET_STORAGE:'SET_STORAGE',
     REMOVE_STORAGE:'REMOVE_STORAGE',
-	CLOSE_POPUP_FROM_CONTENT:'CLOSE_POPUP_FROM_CONTENT'
+	CLOSE_POPUP:'CLOSE_POPUP',
+	UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON'
 }
 
+let titlesList = new Array();
 let observerAdded = false;
 let tabId = null;
 let chkStackTitlesChecked = false;
+let pageChanged = false;
 
 const insertTvShow = (list, entry) => {
 	list.push(new Object({
@@ -98,31 +101,34 @@ const addObserverMutation = () => {
 	const targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div');
 	const config = {childList:true};
 	let prevLastElement = null;
-	const callback = (mutationList, observer) => {
+	const callback = async (mutationList, observer) => {
 		for (const mutation of mutationList) {
 			if (mutation.type === 'childList') {
-				//Send Message to Popup
-				browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},(data)=>{
-					let list = JSON.parse(data);
+				try {
 					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
 					let mediaType = getMediaType(cells[0]);
 					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
 						for (const cell of cells) {
-							if (!entryExists(list,cell, mediaType)) {
+							if (!entryExists(titlesList,cell, mediaType)) {
 								if (mediaType === MOVIE) {
-									insertMovie(list, cell);
+									insertMovie(titlesList, cell);
 								}
 								else if (mediaType === TV_SHOW) {
-									insertTvShow(list, cell);
+									insertTvShow(titlesList, cell);
 								}
-								browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(list)},(response)=>{
-
-								});
+								try {
+									await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
+									await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
+								} catch(err) {
+									//Popup is not open. That's Okay!
+								}
 							}
 						}
 					}
 					prevLastElement = cells[cells.length-1];
-				});
+				} catch(err) {
+					console.error(`Error retrieving tab's storage: ${err.message}`);
+				}
 			}
 		}
 	}
@@ -131,25 +137,40 @@ const addObserverMutation = () => {
 }
 
 const updateList = async () => {
-	let list = Array();
+	let output = null;
 	const elements = document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
 	let mediaType = getMediaType(elements[0]);
-	await browser.runtime.sendMessage({type:GET_STORAGE,id:tabId},async (data)=>{
-		if (data) list = JSON.parse(data);
+	try {
 		for (const el of elements) {
-			if (!entryExists(list,el,mediaType)) {
+			if (!entryExists(titlesList,el,mediaType)) {
 				if (mediaType === MOVIE) {
-					insertMovie(list, el);
+					insertMovie(titlesList, el);
 				}
 				else if (mediaType === TV_SHOW) {
-					insertTvShow(list, el);
+					insertTvShow(titlesList, el);
 				}
 			}
 		}
-		await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(list)},(response)=>{
-			return list;
-		});
-	});
+		output = titlesList;
+	} catch(err) {
+		console.error(`Error retrieving tab's storage: ${err.message}`);
+	}
+	return output;
+}
+
+const updateStorage = async () => {
+	let output = false;
+	try {
+		await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
+		output = true;
+	} catch(err) {
+		console.error(`Error Updating Storage: ${err.message}`);
+	}
+	return output;
+}
+
+const getTotalTitles = () => {
+	return document.querySelector('[class^=PageHeaderLeft-pageHeaderLeft] > span[class^=PageHeaderBadge-badge]')?.textContent;
 }
 
 const repositionTitles = () => {
@@ -163,6 +184,7 @@ const revertTitles = () => {
 	document.getElementById('tempStyles').textContent = '';
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.display = 'contents';
 	chkStackTitlesChecked = false;
+	titlesList = new Array();
 }
 
 const createStylesheet = () => {
@@ -177,6 +199,7 @@ const createStylesheet = () => {
 const awaitUpdate = delay => new Promise((resolve, reject)=>{
 	setTimeout(async ()=>{
 		const res = await updateList();
+		await updateStorage();
 		if (Array.isArray(res)) {
 			resolve(true);
 		}
@@ -197,18 +220,6 @@ const clearStorage = async () => {
 const messageHandler = async (data, sender) => {
 	let response = null;
 	switch(data.type) {
-		case 'verifyDomain':
-			const localhostIp = /127\.0\.0\.1/;
-			const localhost = /localhost/;
-			const plexUrl = /app\.plex\.tv\//;
-			const url = location.href;
-			if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
-				response = true;
-			}
-			else {
-				response = false;
-			}
-			break;
 		case 'setTabIdInContent':
 			if (!tabId) tabId = data.tabId;
 			response = tabId;
@@ -221,6 +232,9 @@ const messageHandler = async (data, sender) => {
 			createStylesheet();
 			await updateList();
 			break;
+		case 'updateStorage':
+			response = await updateStorage();
+			break;
 		case 'stackTitles':
 			await clearStorage();
 			if (data.repositionTitles) {
@@ -229,37 +243,41 @@ const messageHandler = async (data, sender) => {
 			else {
 				revertTitles();
 			}
+			const numOfTitles = getTotalTitles();
+			if (numOfTitles) response = parseInt(numOfTitles);
 			await awaitUpdate(250);
 			break;
 		case 'isChecked':
 			response = chkStackTitlesChecked;
+			break;
+		case 'CLOSE_POPUP':
+            data.window.close();
+            break;
+		case 'PAGE_CHANGED':
+			if (pageChanged) {
+				response = pageChanged;
+				titlesList = new Array();
+				pageChanged = false;
+			}
 			break;
 		default:
 	}
 	return Promise.resolve(response);
 }
 
-const closePopup = async () => {
-	try {
-		await browser.runtime.sendMessage({type:CLOSE_POPUP_FROM_CONTENT});
-	} catch(err) {
-		//Popup is not open
-	}
-}
-
 const init = async () => {
-	closePopup();
-	observerAdded = false;
-	clearStorage();
-	createStylesheet();
-	addObserverMutation();
-	await updateList();
+	pageChanged = true;
+	setTimeout(async()=>{
+		observerAdded = false;
+		createStylesheet();
+		addObserverMutation();
+		await updateList();
+	},500);
 }
 
-;(async function init(){
-	await closePopup();
+;(async function main(){
+	pageChanged = true;
 	observerAdded = false;
 	browser.runtime.onMessage.addListener(messageHandler);
 	window.addEventListener('hashchange',init);
-	clearStorage();
 })();
