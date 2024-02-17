@@ -118,7 +118,7 @@ const addObserverMutation = () => {
 								}
 								try {
 									await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
-									await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
+									if (!chkStackTitlesChecked) await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
 								} catch(err) {
 									//Popup is not open. That's Okay!
 								}
@@ -174,16 +174,16 @@ const getTotalTitles = () => {
 }
 
 const repositionTitles = () => {
+	chkStackTitlesChecked = true;
 	const css = '[class^=ListRow] {top:0 !important; left:0 !important}';
 	document.getElementById('tempStyles').textContent = css;
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.removeProperty('display');
-	chkStackTitlesChecked = true;
 }
 
 const revertTitles = () => {
+	chkStackTitlesChecked = false;
 	document.getElementById('tempStyles').textContent = '';
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.display = 'contents';
-	chkStackTitlesChecked = false;
 	titlesList = new Array();
 }
 

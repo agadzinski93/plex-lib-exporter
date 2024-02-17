@@ -68,6 +68,7 @@ const waitForTilesToLoad = (delay, numOfTitles) => new Promise((resolve, reject)
             const data = await getStorage(tabId);
             let titles = JSON.parse(data);
             if (titles.length === numOfTitles || fetchAttempts === 0) {
+                await setStorage(tabId);
                 header.textContent = `${titles.length} item(s) found!`;
                 document.getElementById('save').remove();
                 document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
