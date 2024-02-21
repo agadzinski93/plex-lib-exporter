@@ -3,6 +3,8 @@ const CSV_FILE = 'csv';
 const JSON_FILE = 'json';
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
+const SORT_ALPHABETIZED = 'Alphabetized';
+const SORT_YEAR = 'Year';
 
 const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON} = {
     GET_STORAGE:'GET_STORAGE',
@@ -49,7 +51,7 @@ const updateDownloadButton = async () => {
         if (titles.length > 0) {
             header.textContent = `${titles.length} item(s) found!`;
             document.getElementById('save').remove();
-            document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+            document.getElementById('saveContainer').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
             const handleDownload = downloadFileHandler(titles);
             document.getElementById('save').addEventListener('click',handleDownload);
         } else {
@@ -62,16 +64,17 @@ const updateDownloadButton = async () => {
     return output;
 }
 
-const waitForTilesToLoad = (delay, numOfTitles) => new Promise((resolve, reject)=>{
+const waitForTilesToLoad = (delay, numOfTitles,checked) => new Promise((resolve, reject)=>{
+    const header = document.getElementById('header');
 	setTimeout(async ()=>{
 		try {
             const data = await getStorage(tabId);
             let titles = JSON.parse(data);
-            if (titles.length === numOfTitles || fetchAttempts === 0) {
-                await setStorage(tabId);
+            if (titles.length === numOfTitles || !checked) {
+                await setStorage(tabId, titles);
                 header.textContent = `${titles.length} item(s) found!`;
                 document.getElementById('save').remove();
-                document.getElementById('selectAndSubmit').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
+                document.getElementById('saveContainer').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
                 const handleDownload = downloadFileHandler(titles);
                 document.getElementById('save').addEventListener('click',handleDownload);
                 resolve(true);
@@ -97,7 +100,7 @@ const handleStackingTitles = async (e) => {
     do {
         fetchAttempts++;
         try {
-            done = await waitForTilesToLoad(250,numOfTitles);
+            done = await waitForTilesToLoad(250,numOfTitles,checked);
             if (!checked) done = true;
             //console.log(`Fetch #:${fetchAttempts} | Done: ${done} | Num of Titles: ${numOfTitles}`);
         } catch(err) {
@@ -136,6 +139,13 @@ const createDownloadButton = async () => {
                 ['option',null,null,null,CSV_FILE.toUpperCase()],
                 ['option',null,null,null,JSON_FILE.toUpperCase()]
             ]],
+            ['select',null,{id:'sortBy'},[
+                ['option',null,null,null,'Sort by'],
+                ['option',null,null,null,SORT_ALPHABETIZED],
+                ['option',null,null,null,SORT_YEAR]
+            ]],
+        ]],
+        ['div',['saveContainer'],{id:'saveContainer'},[
             ['button',null,{id:'save'},null,'Save']
         ]]
     ]));
@@ -170,10 +180,26 @@ const appendTvShowToCsv = (entry) => {
     entry.title = escapeDoubleQuotes(entry.title);
     return `"${entry.title}","${entry.year}","${entry.numOfSeasons}","${entry.avgEpisodeDuration}"`;
 }
-
-/*
-    Add options for: sorting by title/year
-*/
+const compareByYear = (a,b) => {
+    return a.year - b.year;
+}
+const compareByTitles = (a,b) => {
+    return new Intl.Collator('en').compare(a.title,b.title);
+}
+const sortTitles = (titles) => {
+    let sortedTitles = titles;
+    const sortBy = document.getElementById('sortBy');
+    switch(sortBy.value) {
+        case SORT_ALPHABETIZED:
+            sortedTitles.sort(compareByTitles);
+            break;
+        case SORT_YEAR:
+            sortedTitles.sort(compareByYear);
+            break;
+        default:
+    }
+    return sortedTitles;
+}
 
 const stringifyTitles = (titles, fileType = TXT_FILE) => {
     let output = "";
@@ -244,7 +270,8 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
 
 const downloadFileHandler = (titles) => async (e) => {
     const fileType = document.getElementById('fileType').value.toLowerCase();
-    const data = new Blob([stringifyTitles(titles,fileType)],{type:'text/plain', endings:'native'});
+    const sortedTitles = sortTitles(titles);
+    const data = new Blob([stringifyTitles(sortedTitles,fileType)],{type:'text/plain', endings:'native'});
     const anchor = document.createElement('a');
     anchor.href = URL.createObjectURL(data);
     anchor.download = `titles.${fileType}`;

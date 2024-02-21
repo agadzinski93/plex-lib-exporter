@@ -108,19 +108,13 @@ const addObserverMutation = () => {
 					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
 					let mediaType = getMediaType(cells[0]);
 					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-						for (const cell of cells) {
+						for (const [index,cell] of cells.entries()) {
 							if (!entryExists(titlesList,cell, mediaType)) {
 								if (mediaType === MOVIE) {
 									insertMovie(titlesList, cell);
 								}
 								else if (mediaType === TV_SHOW) {
 									insertTvShow(titlesList, cell);
-								}
-								try {
-									await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
-									if (!chkStackTitlesChecked) await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
-								} catch(err) {
-									//Popup is not open. That's Okay!
 								}
 							}
 						}
@@ -130,6 +124,13 @@ const addObserverMutation = () => {
 					console.error(`Error retrieving tab's storage: ${err.message}`);
 				}
 			}
+		}
+		try {
+			await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
+			await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
+			
+		} catch(err) {
+			//Popup is not open. That's Okay!
 		}
 	}
 	const observer = new MutationObserver(callback);
@@ -275,7 +276,7 @@ const init = async () => {
 	},500);
 }
 
-;(async function main(){
+;(function main(){
 	pageChanged = true;
 	observerAdded = false;
 	browser.runtime.onMessage.addListener(messageHandler);

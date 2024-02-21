@@ -8,13 +8,28 @@ body {
 .textAlignCenter {
     text-align:center;
 }
+.selectAndSubmit {
+    margin:0 auto;
+    width:18rem;
+}
 .selectAndSubmit :is(select, button) {
-    padding:0.5rem 1rem;
     margin:0 0.5rem;
     width:8rem;
+}
+.saveContainer {
+    width:17rem;
+    margin:1rem auto;
+}
+.saveContainer > button {
+    width:17rem;
+    background-color:#7CCBEC;
+}
+select, button{
+    padding:0.5rem 1rem;
     border:0;
     background-color:#EEA02D;
     text-align:center;
+    cursor:pointer;
 }
 option:hover,
 option:active {
