@@ -1,12 +1,13 @@
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
 
-const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON} = {
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX} = {
     GET_STORAGE:'GET_STORAGE',
     SET_STORAGE:'SET_STORAGE',
     REMOVE_STORAGE:'REMOVE_STORAGE',
 	CLOSE_POPUP:'CLOSE_POPUP',
-	UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON'
+	UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON',
+	IS_PLEX:'IS_PLEX'
 }
 
 let titlesList = new Array();
@@ -218,6 +219,14 @@ const clearStorage = async () => {
 	}
 }
 
+const onPlexPage = () => {
+	return {
+		isPlex:(document.getElementById('plex')) ? true : false,
+		isPlexLibrary:(document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child')) ? true : false,
+		isDetailedLibrary:(document.querySelector('[class^=MetadataDetailsRow-titlesContainer]')) ? true : false
+	}
+}
+
 const messageHandler = async (data, sender) => {
 	let response = null;
 	switch(data.type) {
@@ -260,6 +269,9 @@ const messageHandler = async (data, sender) => {
 				titlesList = new Array();
 				pageChanged = false;
 			}
+			break;
+		case IS_PLEX:
+			response = onPlexPage();
 			break;
 		default:
 	}

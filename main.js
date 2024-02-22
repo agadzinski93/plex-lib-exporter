@@ -6,12 +6,13 @@ const MOVIE = 'movie';
 const SORT_ALPHABETIZED = 'Alphabetized';
 const SORT_YEAR = 'Year';
 
-const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON} = {
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX} = {
     GET_STORAGE:'GET_STORAGE',
     SET_STORAGE:'SET_STORAGE',
     REMOVE_STORAGE:'REMOVE_STORAGE',
     CLOSE_POPUP:'CLOSE_POPUP',
-    UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON'
+    UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON',
+    IS_PLEX:'IS_PLEX'
 }
 
 let fetchAttempts = 0;
@@ -333,6 +334,35 @@ const setTabId = async () => {
 const pageChanged = async () => {
     return await browser.tabs.sendMessage(tabId,{type:'PAGE_CHANGED'});
 }
+const displayMessage = (msg) => {
+    document.getElementById('header').textContent = msg;
+}
+const isPagePlex = (result) => {
+    let output = true;
+    if (!result.isPlex) {
+        output = false;
+        displayMessage('Plex Not Detected.');
+    }
+    if (output && !result.isPlexLibrary) {
+        output = false;
+        displayMessage('Plex Detected! Make sure you are viewing a library.');
+    }
+    if (output && !result.isDetailedLibrary) {
+        output = false;
+        displayMessage('Plex library detected! Make sure you are in \'details\' view.');
+    }
+    return output;
+}
+const verifyTabIsPlex = async () => {
+    let output = null;
+    try {  
+        output = await browser.tabs.sendMessage(tabId,{type:IS_PLEX});
+    } catch(err) {
+        console.error(`Error verifying tab is plex: ${err.message}`);
+    }
+    console.log(output);
+    return output;
+}
 
 const verifyDomain = async () => {
     let response = false;
@@ -343,12 +373,14 @@ const verifyDomain = async () => {
         const localhost = /localhost/;
         const plexUrl = /app\.plex\.tv\//;
         if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
-            response = true;
             await setTabId();
-            if (await pageChanged()) {
-                removeStorage(tabId);
+            if (isPagePlex(await verifyTabIsPlex())) {
+                response = true;
+                if (await pageChanged()) {
+                    removeStorage(tabId);
+                }
+                await load();
             }
-            await load();
         }
         else {
             document.getElementById('header').textContent = `Unsupported URL. Make sure you're on localhost, 127.0.0.1, or app.plex.tv`;
