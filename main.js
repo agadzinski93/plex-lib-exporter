@@ -3,6 +3,8 @@ const CSV_FILE = 'csv';
 const JSON_FILE = 'json';
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
+const ALBUM = 'Albums';
+const TRACK = 'Tracks';
 const SORT_ALPHABETIZED = 'Alphabetized';
 const SORT_YEAR = 'Year';
 
@@ -19,6 +21,7 @@ let fetchAttempts = 0;
 let fetchSuccess = false;
 let previousListLength = null;
 let tabId = null;
+let musicListType = null;
 
 document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){
     const el = document.createElement(element);
@@ -229,6 +232,10 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         for (const title of titles) output += `${appendTvShowToTxt(title)}\n`;
                     }
                     break;
+                case ALBUMS:
+                    break;
+                case TRACKS:
+                    break;
                 default:
             }
             break;
@@ -306,7 +313,7 @@ const load = async () => {
             const tabs = await browser.tabs.query({currentWindow:true,active:true});
             tabId = tabs[0].id
         }
-        await browser.tabs.sendMessage(tabId,{type:'updateList'});
+        await browser.tabs.sendMessage(tabId,{type:'updateList',mediaType});
         await browser.tabs.sendMessage(tabId,{type:'updateStorage'});
         setTimeout(async ()=>{
             await getTitles();
@@ -339,17 +346,12 @@ const displayMessage = (msg) => {
 }
 const isPagePlex = (result) => {
     let output = true;
-    if (!result.isPlex) {
+    if (!result.isPlex || !result.isScannablePage) {
+        displayMessage(result.msg);
         output = false;
-        displayMessage('Plex Not Detected.');
     }
-    if (output && !result.isPlexLibrary) {
-        output = false;
-        displayMessage('Plex Detected! Make sure you are viewing a library.');
-    }
-    if (output && !result.isDetailedLibrary) {
-        output = false;
-        displayMessage('Plex library detected! Make sure you are in \'details\' view.');
+    else {
+        mediaType = result.mediaType;
     }
     return output;
 }
@@ -360,7 +362,6 @@ const verifyTabIsPlex = async () => {
     } catch(err) {
         console.error(`Error verifying tab is plex: ${err.message}`);
     }
-    console.log(output);
     return output;
 }
 

@@ -1,5 +1,7 @@
 const TV_SHOW = 'tv';
 const MOVIE = 'movie';
+const ALBUM = 'Albums';
+const TRACK = 'Tracks';
 
 const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX} = {
     GET_STORAGE:'GET_STORAGE',
@@ -10,14 +12,15 @@ const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON
 	IS_PLEX:'IS_PLEX'
 }
 
-let titlesList = new Array();
-let observerAdded = false;
+let TITLES_LIST = new Array();
+let MEDIA_TYPE = null;
+let OBSERVER_ADDED = false;
 let tabId = null;
 let chkStackTitlesChecked = false;
-let pageChanged = false;
+let PAGE_CHANGED = false;
 
-const insertTvShow = (list, entry) => {
-	list.push(new Object({
+const insertTvShow = (entry) => {
+	TITLES_LIST.push(new Object({
 		title:entry.children[0].children[0].textContent,
 		year:(entry.children[1]?.children[0]?.textContent) ? entry.children[1].children[0].textContent : null,
 		numOfSeasons:(entry.children[1]?.children[2]?.textContent) ? entry.children[1]?.children[2]?.textContent : null,
@@ -25,11 +28,24 @@ const insertTvShow = (list, entry) => {
 	}));
 }
 
-const insertMovie = (list, entry) => {
-	list.push(new Object({
+const insertMovie = (entry) => {
+	TITLES_LIST.push(new Object({
 		title:entry.children[0].children[0].textContent,
 		year:(entry.children[1]?.children[0]?.textContent) ? entry.children[1].children[0].textContent : null,
 		duration:(entry.children[1]?.children[2]?.textContent) ? entry.children[1].children[2].textContent : null
+	}));
+}
+
+const insertAlbum = (entry) => {
+
+}
+
+const insertTrack = (entry) => {
+	TITLES_LIST.push(new Object({
+		title:entry.children[2].children[0].textContent,
+		albumArtist:(entry.children[3]?.children[0]?.textContent) ? entry.children[3].children[0].textContent : null,
+		album:(entry.children[4]?.children[0]?.textContent) ? entry.children[4].children[0].textContent : null,
+		duration:(entry.children[5]?.children[0]?.textContent) ? entry.children[5].children[0].textContent : null
 	}));
 }
 
@@ -38,22 +54,23 @@ const insertMovie = (list, entry) => {
  * @param {object} entry
  * @returns {boolean}
  */
-const entryExists = (list, entry, mediaType) => {
+const entryExists = (entry) => {
 	let found = false;
 	let i = 0;
 	let title,
-		year;
-	switch(mediaType) {
+		year,
+		duration;
+	switch(MEDIA_TYPE) {
 		case TV_SHOW:
 			title = entry.children[0].children[0].textContent;
 			year = (entry.children[1]?.children[0]?.textContent) ? entry.children[1].children[0].textContent : null;
 			const numOfSeasons = (entry.children[1]?.children[2]?.textContent) ? entry.children[1]?.children[2]?.textContent : null;
 			const avgEpisodeDuration = (entry.children[1]?.children[4]?.textContent) ? entry.children[1].children[4].textContent : null;
-			while(i < list.length && !found) {
-				if (title === list[i].title &&
-					year === list[i].year &&
-					numOfSeasons === list[i].numOfSeasons &&
-					avgEpisodeDuration === list[i].avgEpisodeDuration) {
+			while(i < TITLES_LIST.length && !found) {
+				if (title === TITLES_LIST[i].title &&
+					year === TITLES_LIST[i].year &&
+					numOfSeasons === TITLES_LIST[i].numOfSeasons &&
+					avgEpisodeDuration === TITLES_LIST[i].avgEpisodeDuration) {
 						found = true;
 				}
 				i++;
@@ -62,16 +79,30 @@ const entryExists = (list, entry, mediaType) => {
 		case MOVIE:
 			title = entry.children[0].children[0].textContent;
 			year = (entry.children[1]?.children[0]?.textContent) ? entry.children[1].children[0].textContent : null;
-			const duration = (entry.children[1]?.children[2]?.textContent) ? entry.children[1].children[2].textContent : null;
-			while(i < list.length && !found) {
-				if (title === list[i].title &&
-					year === list[i].year &&
-					duration === list[i].duration) {
+			duration = (entry.children[1]?.children[2]?.textContent) ? entry.children[1].children[2].textContent : null;
+			while(i < TITLES_LIST.length && !found) {
+				if (title === TITLES_LIST[i].title &&
+					year === TITLES_LIST[i].year &&
+					duration === TITLES_LIST[i].duration) {
 						found = true;
 				}
 				i++;
 			}
 			break;
+		case TRACK:
+			title = entry.children[2].children[0].textContent;
+			let albumArtist = entry.children[3]?.children[0]?.textContent;
+			let album = entry.children[4]?.children[0]?.textContent;
+			duration = entry.children[5]?.children[0]?.textContent;
+			while (i < TITLES_LIST.length && !found) {
+				if (title === TITLES_LIST[i].title &&
+					albumArtist === TITLES_LIST[i].albumArtist &&
+					album === TITLES_LIST[i].album &&
+					duration === TITLES_LIST[i].duration) {
+						found = true;
+					}
+					i++
+			}
 		default:
 	}
 	return found;
@@ -84,41 +115,63 @@ const entryExists = (list, entry, mediaType) => {
  */
 const entriesMatch = (entry, prevEntry) => {
 	if (!entry || !prevEntry) return false;
-	return (entry.children[0].children[0].textContent === prevEntry.children[0].children[0].textContent);
-}
-
-const getMediaType = (entry) => {
-	let output = "";
-	if (entry.children[1].children[2].textContent.includes('min')) {
-		output = MOVIE;
+	if (MEDIA_TYPE === TRACK) {
+		return (entry.children[2].children[0].textContent === prevEntry.children[2].children[0].textContent);
 	}
-	else if (entry.children[1].children[2].textContent.includes('season')) {
-		output = TV_SHOW;
+	else {
+		return (entry.children[0].children[0].textContent === prevEntry.children[0].children[0].textContent);
 	}
-	return output;
 }
 
 const addObserverMutation = () => {
-	const targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div');
+	let targetNode = null;
+	if ([ALBUM,TRACK].includes(MEDIA_TYPE)) {
+		targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div:nth-child(2)');
+	}
+	else {
+		targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div');
+	}
 	const config = {childList:true};
 	let prevLastElement = null;
 	const callback = async (mutationList, observer) => {
 		for (const mutation of mutationList) {
 			if (mutation.type === 'childList') {
 				try {
-					const cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
-					let mediaType = getMediaType(cells[0]);
-					if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-						for (const [index,cell] of cells.entries()) {
-							if (!entryExists(titlesList,cell, mediaType)) {
-								if (mediaType === MOVIE) {
-									insertMovie(titlesList, cell);
-								}
-								else if (mediaType === TV_SHOW) {
-									insertTvShow(titlesList, cell);
+					let cells = null;
+					switch(MEDIA_TYPE) {
+						case MOVIE:
+							cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
+							if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+								for (const [index,cell] of cells.entries()) {
+									if (!entryExists(cell)) insertMovie(cell);
 								}
 							}
-						}
+							break;
+						case TV_SHOW:
+							cells = document.querySelectorAll("[class^=MetadataDetailsRow-titlesContainer]");
+							if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertTvShow(cell);
+								}
+							}
+							break;
+						case ALBUM:
+							cells = document.querySelectorAll('[class^=data-testid=cellItem]');
+							if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertAlbum(cell);
+								}
+							}
+							break;
+						case TRACK:
+							cells = document.querySelectorAll('[class^=DirectoryListPageContent-pageContentScroller] [class^=ListRow-]');
+							if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertTrack(cell);
+								}
+							}
+							break;
+						default:
 					}
 					prevLastElement = cells[cells.length-1];
 				} catch(err) {
@@ -127,7 +180,7 @@ const addObserverMutation = () => {
 			}
 		}
 		try {
-			await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
+			await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(TITLES_LIST)});
 			await browser.runtime.sendMessage({type:UPDATE_DOWNLOAD_BUTTON});
 			
 		} catch(err) {
@@ -140,20 +193,35 @@ const addObserverMutation = () => {
 
 const updateList = async () => {
 	let output = null;
-	const elements = document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
-	let mediaType = getMediaType(elements[0]);
+	let elements = null;
 	try {
-		for (const el of elements) {
-			if (!entryExists(titlesList,el,mediaType)) {
-				if (mediaType === MOVIE) {
-					insertMovie(titlesList, el);
+		switch (MEDIA_TYPE) {
+			case MOVIE:
+				elements =  document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
+				for (const el of elements) {
+					if (!entryExists(el)) insertMovie(el);
 				}
-				else if (mediaType === TV_SHOW) {
-					insertTvShow(titlesList, el);
+				break;
+			case TV_SHOW:
+				elements =  document.querySelectorAll('[class^=MetadataDetailsRow-titlesContainer]');
+				for (const el of elements) {
+					if (!entryExists(el)) insertTvShow(el);
 				}
-			}
+				break;
+			case ALBUM:
+				elements = document.querySelectorAll('[class^=data-testid=cellItem]');
+				for (const el of elements) {
+					if (!entryExists(el)) insertAlbum(el);
+				}
+				break;
+			case TRACK:
+				elements = document.querySelectorAll('[class^=DirectoryListPageContent-pageContentScroller] [class^=ListRow-]');
+				for (const el of elements) {
+					if (!entryExists(el)) insertTrack(el);
+				}
+				break;
 		}
-		output = titlesList;
+		output = TITLES_LIST;
 	} catch(err) {
 		console.error(`Error retrieving tab's storage: ${err.message}`);
 	}
@@ -163,7 +231,7 @@ const updateList = async () => {
 const updateStorage = async () => {
 	let output = false;
 	try {
-		await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(titlesList)});
+		await browser.runtime.sendMessage({type:SET_STORAGE,id:tabId,data:JSON.stringify(TITLES_LIST)});
 		output = true;
 	} catch(err) {
 		console.error(`Error Updating Storage: ${err.message}`);
@@ -186,7 +254,7 @@ const revertTitles = () => {
 	chkStackTitlesChecked = false;
 	document.getElementById('tempStyles').textContent = '';
 	document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.display = 'contents';
-	titlesList = new Array();
+	TITLES_LIST = new Array();
 }
 
 const createStylesheet = () => {
@@ -219,12 +287,51 @@ const clearStorage = async () => {
 	}
 }
 
-const onPlexPage = () => {
-	return {
-		isPlex:(document.getElementById('plex')) ? true : false,
-		isPlexLibrary:(document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child')) ? true : false,
-		isDetailedLibrary:(document.querySelector('[class^=MetadataDetailsRow-titlesContainer]')) ? true : false
+const onScannablePlexPage = () => {
+	let output = {
+		isPlex:true,
+		isScannablePage:true,
+		mediaType:null,
+		msg:null
+	};
+	if (!document.getElementById('plex')) {
+		output.isPlex = false;
+		output.isScannablePage = false;
+		output.msg = 'Plex not detected.';
 	}
+	if (output.isPlex && document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child')) {
+		const detailedItem = document.querySelector('[class^=MetadataDetailsRow-titlesContainer]');
+		if (detailedItem) {
+			if (detailedItem?.children[1]?.children[2]?.textContent.includes('min')) {
+				MEDIA_TYPE = MOVIE;
+				output.mediaType = MEDIA_TYPE;
+			}
+			else if (detailedItem?.children[1].children[2].textContent.includes('season')) {
+				MEDIA_TYPE = TV_SHOW;
+				output.mediaType = MEDIA_TYPE;
+			}
+			else {
+				output.isScannablePage = false;
+				output.msg = 'Plex Detected! Make sure you are viewing a library.';
+			}
+		}
+		else {
+			const filterType = document.querySelector('[class^=PageHeaderLeft-pageHeaderLeft] > button:nth-child(2)')?.textContent;
+			if (filterType === ALBUM || filterType === TRACK) {
+				MEDIA_TYPE = filterType;
+				output.mediaType = MEDIA_TYPE;
+			}
+			else {
+				output.isScannablePage = false;
+				output.msg = 'Plex library detected! Make sure you are in \'details\' view. If viewing an album, be sure the items are listed by \'album\' or \'tracks\' and not artist in the upper left.';
+			}
+		}
+	}
+	else {
+		output.isScannablePage = false;
+		output.msg = 'Plex Detected! Make sure you are viewing a library.';
+	}
+	return output;
 }
 
 const messageHandler = async (data, sender) => {
@@ -235,12 +342,12 @@ const messageHandler = async (data, sender) => {
 			response = tabId;
 			break;
 		case 'updateList':
-			if (!observerAdded) {
-				observerAdded = true;
+			if (!OBSERVER_ADDED) {
+				OBSERVER_ADDED = true;
 				addObserverMutation();
 			}
 			createStylesheet();
-			await updateList();
+			await updateList(data.mediaType);
 			break;
 		case 'updateStorage':
 			response = await updateStorage();
@@ -264,14 +371,14 @@ const messageHandler = async (data, sender) => {
             data.window.close();
             break;
 		case 'PAGE_CHANGED':
-			if (pageChanged) {
-				response = pageChanged;
-				titlesList = new Array();
-				pageChanged = false;
+			if (PAGE_CHANGED) {
+				response = PAGE_CHANGED;
+				TITLES_LIST = new Array();
+				PAGE_CHANGED = false;
 			}
 			break;
 		case IS_PLEX:
-			response = onPlexPage();
+			response = onScannablePlexPage();
 			break;
 		default:
 	}
@@ -279,18 +386,16 @@ const messageHandler = async (data, sender) => {
 }
 
 const init = async () => {
-	pageChanged = true;
+	PAGE_CHANGED = true;
 	setTimeout(async()=>{
-		observerAdded = false;
+		OBSERVER_ADDED = false;
 		createStylesheet();
-		addObserverMutation();
-		await updateList();
 	},500);
 }
 
 ;(function main(){
-	pageChanged = true;
-	observerAdded = false;
+	PAGE_CHANGED = true;
+	OBSERVER_ADDED = false;
 	browser.runtime.onMessage.addListener(messageHandler);
 	window.addEventListener('hashchange',init);
 })();
