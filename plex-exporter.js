@@ -12,12 +12,23 @@ const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON
 	IS_PLEX:'IS_PLEX'
 }
 
+const ALBUM_SORT_OPTIONS = {
+	TITLE:'Title',
+	ALBUM_ARTIST:'Album Artist',
+	YEAR:'Year',
+	RELEASE_DATE:'Release Date',
+	DATE_ADDED:'Date Added',
+	DATE_PLAYED:'Date Played',
+	PLAYES:'Plays'
+}
+
 let TITLES_LIST = new Array();
 let MEDIA_TYPE = null;
 let OBSERVER_ADDED = false;
 let tabId = null;
 let chkStackTitlesChecked = false;
 let PAGE_CHANGED = false;
+let SORT_ALBUMS_BY = null;
 
 const insertTvShow = (entry) => {
 	TITLES_LIST.push(new Object({
@@ -37,7 +48,21 @@ const insertMovie = (entry) => {
 }
 
 const insertAlbum = (entry) => {
-
+	if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
+		TITLES_LIST.push(new Object({
+			artist:entry.children[1].getAttribute('title'),
+			album:(entry.children[2]?.getAttribute('title')) ? entry.children[2].getAttribute('title') : null
+		}));
+	}
+	else {
+		let property = SORT_ALBUMS_BY.replaceAll(' ','');
+		property = property.charAt(0).toLowerCase() + property.slice(1);
+		TITLES_LIST.push(new Object({
+			artist:entry.children[1].getAttribute('title'),
+			album:(entry.children[2]?.getAttribute('title')) ? entry.children[2].getAttribute('title') : null,
+			[property]:(entry.children[3]?.textContent) ? entry.children[3].textContent : null
+		}));
+	}
 }
 
 const insertTrack = (entry) => {
@@ -47,6 +72,18 @@ const insertTrack = (entry) => {
 		album:(entry.children[4]?.children[0]?.textContent) ? entry.children[4].children[0].textContent : null,
 		duration:(entry.children[5]?.children[0]?.textContent) ? entry.children[5].children[0].textContent : null
 	}));
+}
+
+const setSortAlbumsBy = async () => {
+	const sortOption = document.querySelector('[class^=PageHeaderLeft-pageHeaderLeft] > button:nth-child(3)');
+	const optionText = sortOption.textContent;
+	if (Object.values(ALBUM_SORT_OPTIONS).includes(optionText.substring('By '.length))) {
+		SORT_ALBUMS_BY = optionText.substring('By '.length);
+	} 
+	else {
+		SORT_ALBUMS_BY = ALBUM_SORT_OPTIONS.TITLE
+	}
+	await browser.runtime.sendMessage({type:'setSortAlbumsBy',sortBy:SORT_ALBUMS_BY});
 }
 
 /**
@@ -59,7 +96,8 @@ const entryExists = (entry) => {
 	let i = 0;
 	let title,
 		year,
-		duration;
+		duration,
+		album;
 	switch(MEDIA_TYPE) {
 		case TV_SHOW:
 			title = entry.children[0].children[0].textContent;
@@ -89,10 +127,21 @@ const entryExists = (entry) => {
 				i++;
 			}
 			break;
+		case ALBUM:
+			let artist = entry.children[1].getAttribute('title');
+			album = entry.children[2].getAttribute('title');
+			while (i < TITLES_LIST.length && !found) {
+				if (artist === TITLES_LIST[i].artist &&
+					album === TITLES_LIST[i].album) {
+						found = true;
+					}
+					i++
+			}
+			break;
 		case TRACK:
 			title = entry.children[2].children[0].textContent;
 			let albumArtist = entry.children[3]?.children[0]?.textContent;
-			let album = entry.children[4]?.children[0]?.textContent;
+			album = entry.children[4]?.children[0]?.textContent;
 			duration = entry.children[5]?.children[0]?.textContent;
 			while (i < TITLES_LIST.length && !found) {
 				if (title === TITLES_LIST[i].title &&
@@ -125,7 +174,7 @@ const entriesMatch = (entry, prevEntry) => {
 
 const addObserverMutation = () => {
 	let targetNode = null;
-	if ([ALBUM,TRACK].includes(MEDIA_TYPE)) {
+	if (MEDIA_TYPE === TRACK) {
 		targetNode = document.querySelector('[class^=DirectoryListPageContent-pageContentScroller] > div:nth-child(2)');
 	}
 	else {
@@ -156,7 +205,7 @@ const addObserverMutation = () => {
 							}
 							break;
 						case ALBUM:
-							cells = document.querySelectorAll('[class^=data-testid=cellItem]');
+							cells = document.querySelectorAll('[data-testid=cellItem]');
 							if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
 								for (const cell of cells) {
 									if (!entryExists(cell)) insertAlbum(cell);
@@ -209,7 +258,8 @@ const updateList = async () => {
 				}
 				break;
 			case ALBUM:
-				elements = document.querySelectorAll('[class^=data-testid=cellItem]');
+				elements = document.querySelectorAll('[data-testid=cellItem]');
+				await setSortAlbumsBy();
 				for (const el of elements) {
 					if (!entryExists(el)) insertAlbum(el);
 				}

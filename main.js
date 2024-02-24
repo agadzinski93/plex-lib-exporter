@@ -8,20 +8,33 @@ const TRACK = 'Tracks';
 const SORT_ALPHABETIZED = 'Alphabetized';
 const SORT_YEAR = 'Year';
 
-const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX} = {
+const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX,
+    SET_SORT_ALBUMS_BY} = {
     GET_STORAGE:'GET_STORAGE',
     SET_STORAGE:'SET_STORAGE',
     REMOVE_STORAGE:'REMOVE_STORAGE',
     CLOSE_POPUP:'CLOSE_POPUP',
     UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON',
-    IS_PLEX:'IS_PLEX'
+    IS_PLEX:'IS_PLEX',
+    SET_SORT_ALBUMS_BY:'setSortAlbumsBy'
+}
+
+const ALBUM_SORT_OPTIONS = {
+	TITLE:'Title',
+	ALBUM_ARTIST:'Album Artist',
+	YEAR:'Year',
+	RELEASE_DATE:'Release Date',
+	DATE_ADDED:'Date Added',
+	DATE_PLAYED:'Date Played',
+	PLAYES:'Plays'
 }
 
 let fetchAttempts = 0;
 let fetchSuccess = false;
 let previousListLength = null;
 let tabId = null;
-let musicListType = null;
+let MEDIA_TYPE = null;
+let SORT_ALBUMS_BY = null;
 
 document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){
     const el = document.createElement(element);
@@ -162,19 +175,24 @@ const escapeDoubleQuotes = (str) => {
     return str.replaceAll('"','""');
 }
 
-const getMediaType = (entry) => {
-    let output = MOVIE;
-    if (entry.hasOwnProperty('numOfSeasons')) {
-        output = TV_SHOW;
-    }
-    return output;
-}
-
 const appendMovieToTxt = (entry) => {
     return `${entry.title} ${entry.year} ${entry.duration}`;
 }
 const appendTvShowToTxt = (entry) => {
     return `${entry.title} ${entry.year} ${entry.numOfSeasons} ${entry.avgEpisodeDuration}`;
+}
+const appendAlbumToTxt = (entry, thirdProperty = false) => {
+    if (thirdProperty) {
+        let property = SORT_ALBUMS_BY.replaceAll(' ','');
+		property = property.charAt(0).toLowerCase() + property.slice(1);
+        return `${entry.artist} ${entry.album} ${entry[`${property}`]}`;
+    }
+    else {
+        return `${entry.artist} ${entry.album}`;
+    }
+}
+const appendTrackToTxt = (entry) => {
+    return `${entry.title} ${entry.albumArtist} ${entry.album} ${entry.duration}`;
 }
 const appendMovieToCsv = (entry) => {
     entry.title = escapeDoubleQuotes(entry.title);
@@ -183,6 +201,20 @@ const appendMovieToCsv = (entry) => {
 const appendTvShowToCsv = (entry) => {
     entry.title = escapeDoubleQuotes(entry.title);
     return `"${entry.title}","${entry.year}","${entry.numOfSeasons}","${entry.avgEpisodeDuration}"`;
+}
+const appendAlbumToCsv = (entry, thirdProperty = false) => {
+    if (thirdProperty) {
+        let property = SORT_ALBUMS_BY.replaceAll(' ','');
+		property = property.charAt(0).toLowerCase() + property.slice(1);
+        return `"${entry.artist}","${entry.album}","${entry[`${property}`]}"`;
+    }
+    else {
+        return `"${entry.artist}","${entry.album}"`;
+    }
+}
+const appendTrackToCsv = (entry) => {
+    entry.title = escapeDoubleQuotes(entry.title);
+    return `"${entry.title}","${entry.albumArtist}","${entry.album}","${entry.duration}"`;
 }
 const compareByYear = (a,b) => {
     return a.year - b.year;
@@ -208,11 +240,10 @@ const sortTitles = (titles) => {
 const stringifyTitles = (titles, fileType = TXT_FILE) => {
     let output = "";
     const includeLineNumbers = document.getElementById('chkLineNumbers').checked;
-    const mediaType = getMediaType(titles[0]);
     let i = 0;
     switch(fileType) {
         case TXT_FILE:
-            switch(mediaType) {
+            switch(MEDIA_TYPE) {
                 case MOVIE:
                     output += (includeLineNumbers) ? `# Title Year Duration\n` : `Title Year Duration\n`;
                     if (includeLineNumbers) {
@@ -232,15 +263,43 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         for (const title of titles) output += `${appendTvShowToTxt(title)}\n`;
                     }
                     break;
-                case ALBUMS:
+                case ALBUM:
+                    if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
+                        if (includeLineNumbers) {
+                            output += `# Artist Album\n`;
+                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title)}\n`;
+                        }
+                        else {
+                            output += 'Artist Album\n';
+                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
+                        }
+                    }
+                    else {
+                        if (includeLineNumbers) {
+                            output += `# Artist Album ${SORT_ALBUMS_BY}\n`;
+                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title,true)}\n`;
+                        }
+                        else {
+                            output += `Artist Album ${SORT_ALBUMS_BY}\n`;
+                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
+                        }
+                    }
                     break;
-                case TRACKS:
+                case TRACK:
+                   if (includeLineNumbers) {
+                        output += `# Title Album Artist Album Duration\n`;
+                        for (const title of titles) output += `${++i} ${appendTrackToTxt(title)}\n`;
+                   }
+                   else {
+                    output += `Title Album Artist Album Duration\n`;
+                    for (const title of titles) output += `${appendTrackToTxt(title)}\n`;
+                   }
                     break;
                 default:
             }
             break;
         case CSV_FILE:
-            switch(mediaType) {
+            switch(MEDIA_TYPE) {
                 case MOVIE:
                     output += (includeLineNumbers) ? '"#","Title","Year","Duration"\n' : '"Title","Year","Duration"\n';
                     if (includeLineNumbers) {
@@ -258,6 +317,37 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                     }
                     else {
                         for (const title of titles) output += `${appendTvShowToCsv(title)}\n`;
+                    }
+                    break;
+                case ALBUM:
+                    if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
+                        if (includeLineNumbers) {
+                            output += `"#","Artist","Album"\n`;
+                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title)}\n`;
+                        }
+                        else {
+                            output += '"Artist","Album"\n';
+                            for (const title of titles) output += `${appendAlbumToCsv(title)}\n`;
+                        }
+                    }
+                    else {
+                        if (includeLineNumbers) {
+                            output += `"#","Artist","Album","${SORT_ALBUMS_BY}"\n`;
+                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title,true)}\n`;
+                        }
+                        else {
+                            output += `"Artist","Album","${SORT_ALBUMS_BY}"\n`;
+                            for (const title of titles) output += `${appendAlbumToCsv(title,true)}\n`;
+                        }
+                    }
+                    break;
+                case TRACK:
+                    output += (includeLineNumbers) ? '"#","Title","Album Artist","Album","Track"\n' : '"Title","Album Artist","Album","Track"\n';
+                    if (includeLineNumbers) {
+                        for (const title of titles) output += `"${++i}",${appendTrackToCsv(title)}\n`;
+                    }
+                    else {
+                        for (const title of titles) output += `${appendTrackToCsv(title)}\n`;
                     }
                     break;
                 default:
@@ -282,7 +372,7 @@ const downloadFileHandler = (titles) => async (e) => {
     const data = new Blob([stringifyTitles(sortedTitles,fileType)],{type:'text/plain', endings:'native'});
     const anchor = document.createElement('a');
     anchor.href = URL.createObjectURL(data);
-    anchor.download = `titles.${fileType}`;
+    anchor.download = `${MEDIA_TYPE}.${fileType}`;
     URL.revokeObjectURL(data);
     anchor.click();
 }
@@ -313,7 +403,7 @@ const load = async () => {
             const tabs = await browser.tabs.query({currentWindow:true,active:true});
             tabId = tabs[0].id
         }
-        await browser.tabs.sendMessage(tabId,{type:'updateList',mediaType});
+        await browser.tabs.sendMessage(tabId,{type:'updateList',MEDIA_TYPE});
         await browser.tabs.sendMessage(tabId,{type:'updateStorage'});
         setTimeout(async ()=>{
             await getTitles();
@@ -351,7 +441,7 @@ const isPagePlex = (result) => {
         output = false;
     }
     else {
-        mediaType = result.mediaType;
+        MEDIA_TYPE = result.mediaType;
     }
     return output;
 }
@@ -370,10 +460,12 @@ const verifyDomain = async () => {
     try {
         const tabs = await browser.tabs.query({active:true,currentWindow:true});
         const url = tabs[0].url;
-        const localhostIp = /127\.0\.0\.1/;
-        const localhost = /localhost/;
-        const plexUrl = /app\.plex\.tv\//;
-        if (localhostIp.test(url) || localhost.test(url) || plexUrl.test(url)) {
+        const allowableDomains = [
+            /127\.0\.0\.1/,
+            /localhost/,
+            /app\.plex\.tv\//
+        ];
+        if (allowableDomains.some(reg=>reg.test(url))) {
             await setTabId();
             if (isPagePlex(await verifyTabIsPlex())) {
                 response = true;
@@ -436,6 +528,10 @@ const communicationHandler = async (data, sender) => {
                 break;
             case UPDATE_DOWNLOAD_BUTTON:
                 output = await updateDownloadButton();
+                break;
+            case SET_SORT_ALBUMS_BY:
+                SORT_ALBUMS_BY = data.sortBy;
+                output = data.sortBy;
                 break;
             default:
         }
