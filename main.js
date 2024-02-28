@@ -1,11 +1,9 @@
 import { GLOBAL_CONSTANTS } from "./constants/constants.js";
 import { addDomHelpers } from "./utils/domHelpers.js";
 import { getStorage,setStorage,removeStorage } from "./utils/storage.js";
-import { SORT_TITLES } from "./utils/titleHelpers/sortTitles.js";
+import { sortTitles } from "./utils/titleHelpers/sortTitles.js";
 import { stringifyTitles } from "./utils/titleHelpers/stringifyTitles.js";
 addDomHelpers();
-
-const { sortTitles } = SORT_TITLES;
 
 const {
     ALBUM_SORT_OPTIONS, 

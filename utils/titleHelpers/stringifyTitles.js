@@ -1,11 +1,5 @@
 import { GLOBAL_CONSTANTS } from "../../constants/constants.js";
-import { APPEND_TITLES } from "./appendTitles.js";
-const {
-    ALBUM_SORT_OPTIONS,
-    FILE_TYPES,
-    MEDIA_TYPE:MEDIA_FORMAT
-} = GLOBAL_CONSTANTS;
-const {
+import { 
     appendAlbumToCsv,
     appendAlbumToTxt,
     appendMovieToCsv,
@@ -14,7 +8,12 @@ const {
     appendTrackToTxt,
     appendTvShowToCsv,
     appendTvShowToTxt
-} = APPEND_TITLES;
+ } from "./appendTitles.js";
+const {
+    ALBUM_SORT_OPTIONS,
+    FILE_TYPES,
+    MEDIA_TYPE:MEDIA_FORMAT
+} = GLOBAL_CONSTANTS;
 
 const stringifyTitles = (titles, mediaType, sortAlbumsBy, fileType = FILE_TYPES.TXT_FILE) => {
     let output = "";
