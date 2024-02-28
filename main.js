@@ -1,63 +1,19 @@
-const TXT_FILE = 'txt';
-const CSV_FILE = 'csv';
-const JSON_FILE = 'json';
-const TV_SHOW = 'tv';
-const MOVIE = 'movie';
-const ALBUM = 'Albums';
-const TRACK = 'Tracks';
-const SORT_ALPHABETIZED = 'Alphabetized';
-const SORT_YEAR = 'Year';
+import { GLOBAL_CONSTANTS } from "./constants/constants.js";
+import { addDomHelpers } from "./utils/domHelpers.js";
+addDomHelpers();
 
-const {GET_STORAGE,SET_STORAGE,REMOVE_STORAGE,CLOSE_POPUP,UPDATE_DOWNLOAD_BUTTON,IS_PLEX,
-    SET_SORT_ALBUMS_BY} = {
-    GET_STORAGE:'GET_STORAGE',
-    SET_STORAGE:'SET_STORAGE',
-    REMOVE_STORAGE:'REMOVE_STORAGE',
-    CLOSE_POPUP:'CLOSE_POPUP',
-    UPDATE_DOWNLOAD_BUTTON:'UPDATE_DOWNLOAD_BUTTON',
-    IS_PLEX:'IS_PLEX',
-    SET_SORT_ALBUMS_BY:'setSortAlbumsBy'
-}
-
-const ALBUM_SORT_OPTIONS = {
-	TITLE:'Title',
-	ALBUM_ARTIST:'Album Artist',
-	YEAR:'Year',
-	RELEASE_DATE:'Release Date',
-	DATE_ADDED:'Date Added',
-	DATE_PLAYED:'Date Played',
-	PLAYES:'Plays'
-}
+const {
+    ALBUM_SORT_OPTIONS, 
+    MESSAGE_OPTIONS, 
+    TAB_OPTIONS, 
+    MEDIA_TYPE : MEDIA_FORMAT, 
+    FILE_TYPES
+} = GLOBAL_CONSTANTS;
 
 let fetchAttempts = 0;
-let fetchSuccess = false;
-let previousListLength = null;
 let tabId = null;
 let MEDIA_TYPE = null;
 let SORT_ALBUMS_BY = null;
-
-document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){
-    const el = document.createElement(element);
-    if (Array.isArray(classes)) {
-        for (let i = 0; i < classes.length; i++) {
-            el.classList.add(classes[i]);
-        }
-    }
-    if (attributes && typeof attributes === 'object') {
-        for (const [k,v] of Object.entries(attributes)) {
-            el.setAttribute(`${k}`,`${v}`);
-        }
-    }
-    if (text) {
-        el.innerHTML = text;
-    }
-    if (Array.isArray(children) && children.length > 0) {
-        for (let i = 0; i < children.length; i++) {
-            el.append(document.createElementTree(...children[i]));
-        }
-    }
-    return el;
-};
 
 const updateDownloadButton = async () => {
     let output = false;
@@ -76,26 +32,24 @@ const updateDownloadButton = async () => {
         }
         output = true;
     } catch(err) {
-        header.textContent = 'An error occurred.'
+        header.textContent = 'An error occurred.';
     }
     return output;
 }
 
-const waitForTilesToLoad = (delay, numOfTitles,checked) => new Promise((resolve, reject)=>{
+const waitForTilesToLoad = (delay, {numOfTitles,checked, fetchAttempts}) => new Promise((resolve, reject)=>{
     const header = document.getElementById('header');
 	setTimeout(async ()=>{
 		try {
+            await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.UPDATE_LIST,MEDIA_TYPE});
+            await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.UPDATE_STORAGE});
             const data = await getStorage(tabId);
-            let titles = JSON.parse(data);
-            if (titles.length === numOfTitles || !checked) {
+            let titles = (data) && JSON.parse(data);
+            if (data && (titles.length === numOfTitles || !checked)) {
                 await setStorage(tabId, titles);
-                header.textContent = `${titles.length} item(s) found!`;
-                document.getElementById('save').remove();
-                document.getElementById('saveContainer').append(document.createElementTree('button',null,{id:'save'},null,'Save'));
-                const handleDownload = downloadFileHandler(titles);
-                document.getElementById('save').addEventListener('click',handleDownload);
+                await updateDownloadButton();
                 resolve(true);
-            } else if (titles.length === 0) {
+            } else if (titles.length === 0 && fetchAttempts > 1) {
                 header.textContent = 'No items found.'
                 resolve(true);
             } else {
@@ -108,31 +62,34 @@ const waitForTilesToLoad = (delay, numOfTitles,checked) => new Promise((resolve,
 });
 
 const handleStackingTitles = async (e) => {
-    fetchAttempts = 0;
-    fetchSuccess = false;
+    document.getElementById('chkStackTitles').disabled = true;
     const header = document.getElementById('header');
+    header.textContent = 'Loading...'
     const checked = e.target.checked;
-    const numOfTitles = await browser.tabs.sendMessage(tabId,{type: 'stackTitles',repositionTitles:checked});
+    const MAX_ATTEMPTS = 30;
+    fetchAttempts = 0;
+    const numOfTitles = await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.STACK_TITLES,repositionTitles:checked});
     let done = false;
     do {
         fetchAttempts++;
         try {
-            done = await waitForTilesToLoad(250,numOfTitles,checked);
+            done = await waitForTilesToLoad(250,{numOfTitles,checked,fetchAttempts});
             if (!checked) done = true;
-            //console.log(`Fetch #:${fetchAttempts} | Done: ${done} | Num of Titles: ${numOfTitles}`);
         } catch(err) {
             console.error(`Error Stacking Titles: ${err.message}`);
             header.textContent = `Error: Refresh the page and try again!`;
             done = true;
         }
-    } while(!done && fetchAttempts < 25);
+    } while(!done && fetchAttempts < MAX_ATTEMPTS);
+    await updateDownloadButton();
+    document.getElementById('chkStackTitles').disabled = false;
 }
 
 const chkStackTitlesChecked = async () => {
     let output = false;
     try {
         const tabs = await getCurrentWindowTabs();
-        output = await browser.tabs.sendMessage(tabs[0].id,{type:'isChecked'});
+        output = await browser.tabs.sendMessage(tabs[0].id,{type:TAB_OPTIONS.IS_CHECKED});
     } catch(err) {
         console.error(`Error Verifying Stack Checkbox State`);
     }
@@ -152,21 +109,21 @@ const createDownloadButton = async () => {
         ]],
         ['div',['selectAndSubmit'],{id:'selectAndSubmit'},[
             ['select',null,{id:'fileType'},[
-                ['option',null,null,null,TXT_FILE.toUpperCase()],
-                ['option',null,null,null,CSV_FILE.toUpperCase()],
-                ['option',null,null,null,JSON_FILE.toUpperCase()]
+                ['option',null,null,null,FILE_TYPES.TXT_FILE.toUpperCase()],
+                ['option',null,null,null,FILE_TYPES.CSV_FILE.toUpperCase()],
+                ['option',null,null,null,FILE_TYPES.JSON_FILE.toUpperCase()]
             ]],
             ['select',null,{id:'sortBy'},[
                 ['option',null,null,null,'Sort by'],
-                ['option',null,null,null,SORT_ALPHABETIZED],
-                ['option',null,null,null,SORT_YEAR]
+                ['option',null,null,null,ALBUM_SORT_OPTIONS.TITLE],
+                ['option',null,null,null,ALBUM_SORT_OPTIONS.YEAR]
             ]],
         ]],
         ['div',['saveContainer'],{id:'saveContainer'},[
             ['button',null,{id:'save'},null,'Save']
         ]]
     ]));
-    document.getElementById('chkStackTitles').addEventListener('click',handleStackingTitles);
+    document.getElementById('chkStackTitles').addEventListener('change',handleStackingTitles);
     document.getElementById('chkStackTitles').checked = checked;
     if (document.getElementById('tempStyles')?.textContent) document.getElementById('chkStackTitles').checked = true;
 }
@@ -226,10 +183,10 @@ const sortTitles = (titles) => {
     let sortedTitles = titles;
     const sortBy = document.getElementById('sortBy');
     switch(sortBy.value) {
-        case SORT_ALPHABETIZED:
+        case ALBUM_SORT_OPTIONS.TITLE:
             sortedTitles.sort(compareByTitles);
             break;
-        case SORT_YEAR:
+        case ALBUM_SORT_OPTIONS.YEAR:
             sortedTitles.sort(compareByYear);
             break;
         default:
@@ -237,14 +194,14 @@ const sortTitles = (titles) => {
     return sortedTitles;
 }
 
-const stringifyTitles = (titles, fileType = TXT_FILE) => {
+const stringifyTitles = (titles, fileType = FILE_TYPES.TXT_FILE) => {
     let output = "";
     const includeLineNumbers = document.getElementById('chkLineNumbers').checked;
     let i = 0;
     switch(fileType) {
-        case TXT_FILE:
+        case FILE_TYPES.TXT_FILE:
             switch(MEDIA_TYPE) {
-                case MOVIE:
+                case MEDIA_FORMAT.MOVIE:
                     output += (includeLineNumbers) ? `# Title Year Duration\n` : `Title Year Duration\n`;
                     if (includeLineNumbers) {
                         for (const title of titles) output += `${++i} ${appendMovieToTxt(title)}\n`;
@@ -253,7 +210,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         for (const title of titles) output += `${appendMovieToTxt(title)}\n`;
                     }
                     break;
-                case TV_SHOW:
+                case MEDIA_FORMAT.TV_SHOW:
                     if (includeLineNumbers) {
                         output += `# Title Year Number of Seasons Episode Duration\n`;
                         for (const title of titles) output += `${++i} ${appendTvShowToTxt(title)}\n`;
@@ -263,7 +220,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         for (const title of titles) output += `${appendTvShowToTxt(title)}\n`;
                     }
                     break;
-                case ALBUM:
+                case MEDIA_FORMAT.ALBUM:
                     if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
                         if (includeLineNumbers) {
                             output += `# Artist Album\n`;
@@ -285,7 +242,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         }
                     }
                     break;
-                case TRACK:
+                case MEDIA_FORMAT.TRACK:
                    if (includeLineNumbers) {
                         output += `# Title Album Artist Album Duration\n`;
                         for (const title of titles) output += `${++i} ${appendTrackToTxt(title)}\n`;
@@ -298,9 +255,9 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                 default:
             }
             break;
-        case CSV_FILE:
+        case FILE_TYPES.CSV_FILE:
             switch(MEDIA_TYPE) {
-                case MOVIE:
+                case MEDIA_FORMAT.MOVIE:
                     output += (includeLineNumbers) ? '"#","Title","Year","Duration"\n' : '"Title","Year","Duration"\n';
                     if (includeLineNumbers) {
                         for (const title of titles) output += `"${++i}",${appendMovieToCsv(title)}\n`;
@@ -310,7 +267,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                     }
                     
                     break;
-                case TV_SHOW:
+                case MEDIA_FORMAT.TV_SHOW:
                     output += (includeLineNumbers) ? '"#","Title","Year","Seasons","Episode Duration"\n' : '"Title","Year","Seasons","Episode Duration"\n';
                     if (includeLineNumbers) {
                         for (const title of titles) output += `"${++i}",${appendTvShowToCsv(title)}\n`;
@@ -319,7 +276,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         for (const title of titles) output += `${appendTvShowToCsv(title)}\n`;
                     }
                     break;
-                case ALBUM:
+                case MEDIA_FORMAT.ALBUM:
                     if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
                         if (includeLineNumbers) {
                             output += `"#","Artist","Album"\n`;
@@ -341,7 +298,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                         }
                     }
                     break;
-                case TRACK:
+                case MEDIA_FORMAT.TRACK:
                     output += (includeLineNumbers) ? '"#","Title","Album Artist","Album","Track"\n' : '"Title","Album Artist","Album","Track"\n';
                     if (includeLineNumbers) {
                         for (const title of titles) output += `"${++i}",${appendTrackToCsv(title)}\n`;
@@ -353,7 +310,7 @@ const stringifyTitles = (titles, fileType = TXT_FILE) => {
                 default:
             }
             break;
-        case JSON_FILE:
+        case FILE_TYPES.JSON_FILE:
             if (includeLineNumbers) {
                 for (let i = 0; i < titles.length; i++) {
                     titles[i].id = i+1;
@@ -403,8 +360,8 @@ const load = async () => {
             const tabs = await browser.tabs.query({currentWindow:true,active:true});
             tabId = tabs[0].id
         }
-        await browser.tabs.sendMessage(tabId,{type:'updateList',MEDIA_TYPE});
-        await browser.tabs.sendMessage(tabId,{type:'updateStorage'});
+        await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.UPDATE_LIST,MEDIA_TYPE});
+        await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.UPDATE_STORAGE});
         setTimeout(async ()=>{
             await getTitles();
             await updateDownloadButton();
@@ -422,14 +379,14 @@ const setTabId = async () => {
     try {
         const tabs = await getCurrentWindowTabs();
         tabId = tabs[0].id;
-        tabId = await browser.tabs.sendMessage(tabId,{type:'setTabIdInContent',tabId});
+        tabId = await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.SET_TAB_ID_IN_CONTENT_SCRIPT,tabId});
     } catch(err) {
         console.error(`Error Getting/Setting Tab ID: ${err.message}`);
     }
 }
 
 const pageChanged = async () => {
-    return await browser.tabs.sendMessage(tabId,{type:'PAGE_CHANGED'});
+    return await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.PAGE_CHANGED});
 }
 const displayMessage = (msg) => {
     document.getElementById('header').textContent = msg;
@@ -448,7 +405,7 @@ const isPagePlex = (result) => {
 const verifyTabIsPlex = async () => {
     let output = null;
     try {  
-        output = await browser.tabs.sendMessage(tabId,{type:IS_PLEX});
+        output = await browser.tabs.sendMessage(tabId,{type:TAB_OPTIONS.IS_PLEX});
     } catch(err) {
         console.error(`Error verifying tab is plex: ${err.message}`);
     }
@@ -498,7 +455,7 @@ const setStorage = async (id, data) => {
     let success = false;
     try {
         const obj = {};
-        obj[`${id}`] = data;
+        obj[`${id}`] = (typeof data === 'string') ? data : JSON.stringify(data);
         await browser.storage.session.set(obj);
         success = true;
     } catch(err) {
@@ -514,22 +471,22 @@ const communicationHandler = async (data, sender) => {
     let output = false;
     try {
         switch(data.type){
-            case GET_STORAGE:
+            case MESSAGE_OPTIONS.GET_STORAGE:
                 output = await getStorage(data.id);
                 break;
-            case SET_STORAGE:
+            case MESSAGE_OPTIONS.SET_STORAGE:
                 output = await setStorage(data.id,data.data);
                 break;
-            case REMOVE_STORAGE:
+            case MESSAGE_OPTIONS.REMOVE_STORAGE:
                 await removeStorage(data.id);
                 break;
-            case CLOSE_POPUP:
+            case MESSAGE_OPTIONS.CLOSE_POPUP:
                 window.close();
                 break;
-            case UPDATE_DOWNLOAD_BUTTON:
+            case MESSAGE_OPTIONS.UPDATE_DOWNLOAD_BUTTON:
                 output = await updateDownloadButton();
                 break;
-            case SET_SORT_ALBUMS_BY:
+            case MESSAGE_OPTIONS.SET_SORT_ALBUMS_BY:
                 SORT_ALBUMS_BY = data.sortBy;
                 output = data.sortBy;
                 break;

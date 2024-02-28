@@ -17,5 +17,15 @@
 		"default_icon":"star.png",
 		"default_title":"Plex Library Exporter",
 		"default_popup":"view.html"
-	}
+	},
+	"web_accessible_resources":[
+		{
+			"matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
+			"resources":[
+				"constants/constants.js",
+				"utils/insertions.js",
+				"utils/domHelpers.js"
+			]
+		}
+	]
 }
