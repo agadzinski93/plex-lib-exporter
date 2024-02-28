@@ -133,48 +133,38 @@ let SORT_ALBUMS_BY = null;
 			targetNode = document.querySelector(SELECTORS.NON_TRACK_CONTAINER);
 		}
 		const config = {childList:true};
-		let prevLastElement = null;
 		const callback = async (mutationList, observer) => {
+			let cells = null;
 			for (const mutation of mutationList) {
-				if (mutation.type === 'childList') {
+				if (mutation.type === 'childList' && mutation.addedNodes.length === 1) {
 					try {
-						let cells = null;
 						switch(MEDIA_TYPE) {
 							case MEDIA_FORMAT.MOVIE:
 								cells = document.querySelectorAll(SELECTORS.CELLS_MOVIE);
-								if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-									for (const [index,cell] of cells.entries()) {
-										if (!entryExists(cell)) insertMovie(cell);
-									}
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertMovie(cell);
 								}
 								break;
 							case MEDIA_FORMAT.TV_SHOW:
 								cells = document.querySelectorAll(SELECTORS.CELLS_TV_SHOW);
-								if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-									for (const cell of cells) {
-										if (!entryExists(cell)) insertTvShow(cell);
-									}
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertTvShow(cell);
 								}
 								break;
 							case MEDIA_FORMAT.ALBUM:
 								cells = document.querySelectorAll(SELECTORS.CELLS_ALBUM);
-								if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-									for (const cell of cells) {
-										if (!entryExists(cell)) insertAlbum(cell);
-									}
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertAlbum(cell);
 								}
 								break;
 							case MEDIA_FORMAT.TRACK:
 								cells = document.querySelectorAll(SELECTORS.CELLS_TRACK);
-								if (!entriesMatch(cells[cells.length-1],prevLastElement)) {
-									for (const cell of cells) {
-										if (!entryExists(cell)) insertTrack(cell);
-									}
+								for (const cell of cells) {
+									if (!entryExists(cell)) insertTrack(cell);
 								}
 								break;
 							default:
 						}
-						prevLastElement = cells[cells.length-1];
 					} catch(err) {
 						console.error(`Error retrieving tab's storage: ${err.message}`);
 					}

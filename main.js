@@ -299,7 +299,7 @@ const stringifyTitles = (titles, fileType = FILE_TYPES.TXT_FILE) => {
                     }
                     break;
                 case MEDIA_FORMAT.TRACK:
-                    output += (includeLineNumbers) ? '"#","Title","Album Artist","Album","Track"\n' : '"Title","Album Artist","Album","Track"\n';
+                    output += (includeLineNumbers) ? '"#","Title","Album Artist","Album","Duration"\n' : '"Title","Album Artist","Album","Duration"\n';
                     if (includeLineNumbers) {
                         for (const title of titles) output += `"${++i}",${appendTrackToCsv(title)}\n`;
                     }
@@ -505,11 +505,11 @@ const communicationHandler = async (data, sender) => {
 }
 ;(async function main(){
     browser.runtime.onMessage.addListener(communicationHandler);
-        setTimeout(async ()=>{
-            try {
-                await verifyDomain();
-            } catch(err) {
-                console.error(`Popup Init Error: ${err.message}`);
-            }
-        },250); 
+    setTimeout(async ()=>{
+        try {
+            await verifyDomain();
+        } catch(err) {
+            console.error(`Popup Init Error: ${err.message}`);
+        }
+    },250); 
 })();
