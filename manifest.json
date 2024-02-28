@@ -2,7 +2,7 @@
 	"manifest_version":3,
 	"name":"Plex Library Exporter",
 	"version":"0.1.0",
-	"description":"Allows users to export their Plex libraries into text files.",
+	"description":"Allows users to export their Plex libraries into TXT, CSV, and JSON files.",
 	"content_scripts": [
 		{
 		  "matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
@@ -23,8 +23,12 @@
 			"matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
 			"resources":[
 				"constants/constants.js",
-				"utils/insertions.js",
-				"utils/domHelpers.js"
+				"utils/titleHelpers/appendTitles.js",
+				"utils/titleHelpers/insertTitles.js",
+				"utils/titleHelpers/sortTitles.js",
+				"utils/titleHelpers/stringifyTitles.js",
+				"utils/domHelpers.js",
+				"utils/sanitizers.js"
 			]
 		}
 	]

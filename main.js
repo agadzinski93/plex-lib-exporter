@@ -1,12 +1,16 @@
 import { GLOBAL_CONSTANTS } from "./constants/constants.js";
 import { addDomHelpers } from "./utils/domHelpers.js";
+import { getStorage,setStorage,removeStorage } from "./utils/storage.js";
+import { SORT_TITLES } from "./utils/titleHelpers/sortTitles.js";
+import { stringifyTitles } from "./utils/titleHelpers/stringifyTitles.js";
 addDomHelpers();
+
+const { sortTitles } = SORT_TITLES;
 
 const {
     ALBUM_SORT_OPTIONS, 
     MESSAGE_OPTIONS, 
     TAB_OPTIONS, 
-    MEDIA_TYPE : MEDIA_FORMAT, 
     FILE_TYPES
 } = GLOBAL_CONSTANTS;
 
@@ -128,205 +132,10 @@ const createDownloadButton = async () => {
     if (document.getElementById('tempStyles')?.textContent) document.getElementById('chkStackTitles').checked = true;
 }
 
-const escapeDoubleQuotes = (str) => {
-    return str.replaceAll('"','""');
-}
-
-const appendMovieToTxt = (entry) => {
-    return `${entry.title} ${entry.year} ${entry.duration}`;
-}
-const appendTvShowToTxt = (entry) => {
-    return `${entry.title} ${entry.year} ${entry.numOfSeasons} ${entry.avgEpisodeDuration}`;
-}
-const appendAlbumToTxt = (entry, thirdProperty = false) => {
-    if (thirdProperty) {
-        let property = SORT_ALBUMS_BY.replaceAll(' ','');
-		property = property.charAt(0).toLowerCase() + property.slice(1);
-        return `${entry.artist} ${entry.album} ${entry[`${property}`]}`;
-    }
-    else {
-        return `${entry.artist} ${entry.album}`;
-    }
-}
-const appendTrackToTxt = (entry) => {
-    return `${entry.title} ${entry.albumArtist} ${entry.album} ${entry.duration}`;
-}
-const appendMovieToCsv = (entry) => {
-    entry.title = escapeDoubleQuotes(entry.title);
-    return `"${entry.title}","${entry.year}","${entry.duration}"`;
-}
-const appendTvShowToCsv = (entry) => {
-    entry.title = escapeDoubleQuotes(entry.title);
-    return `"${entry.title}","${entry.year}","${entry.numOfSeasons}","${entry.avgEpisodeDuration}"`;
-}
-const appendAlbumToCsv = (entry, thirdProperty = false) => {
-    if (thirdProperty) {
-        let property = SORT_ALBUMS_BY.replaceAll(' ','');
-		property = property.charAt(0).toLowerCase() + property.slice(1);
-        return `"${entry.artist}","${entry.album}","${entry[`${property}`]}"`;
-    }
-    else {
-        return `"${entry.artist}","${entry.album}"`;
-    }
-}
-const appendTrackToCsv = (entry) => {
-    entry.title = escapeDoubleQuotes(entry.title);
-    return `"${entry.title}","${entry.albumArtist}","${entry.album}","${entry.duration}"`;
-}
-const compareByYear = (a,b) => {
-    return a.year - b.year;
-}
-const compareByTitles = (a,b) => {
-    return new Intl.Collator('en').compare(a.title,b.title);
-}
-const sortTitles = (titles) => {
-    let sortedTitles = titles;
-    const sortBy = document.getElementById('sortBy');
-    switch(sortBy.value) {
-        case ALBUM_SORT_OPTIONS.TITLE:
-            sortedTitles.sort(compareByTitles);
-            break;
-        case ALBUM_SORT_OPTIONS.YEAR:
-            sortedTitles.sort(compareByYear);
-            break;
-        default:
-    }
-    return sortedTitles;
-}
-
-const stringifyTitles = (titles, fileType = FILE_TYPES.TXT_FILE) => {
-    let output = "";
-    const includeLineNumbers = document.getElementById('chkLineNumbers').checked;
-    let i = 0;
-    switch(fileType) {
-        case FILE_TYPES.TXT_FILE:
-            switch(MEDIA_TYPE) {
-                case MEDIA_FORMAT.MOVIE:
-                    output += (includeLineNumbers) ? `# Title Year Duration\n` : `Title Year Duration\n`;
-                    if (includeLineNumbers) {
-                        for (const title of titles) output += `${++i} ${appendMovieToTxt(title)}\n`;
-                    }
-                    else {
-                        for (const title of titles) output += `${appendMovieToTxt(title)}\n`;
-                    }
-                    break;
-                case MEDIA_FORMAT.TV_SHOW:
-                    if (includeLineNumbers) {
-                        output += `# Title Year Number of Seasons Episode Duration\n`;
-                        for (const title of titles) output += `${++i} ${appendTvShowToTxt(title)}\n`;
-                    }
-                    else {
-                        output += `Title Year Number of Seasons Episode Duration\n`;
-                        for (const title of titles) output += `${appendTvShowToTxt(title)}\n`;
-                    }
-                    break;
-                case MEDIA_FORMAT.ALBUM:
-                    if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
-                        if (includeLineNumbers) {
-                            output += `# Artist Album\n`;
-                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title)}\n`;
-                        }
-                        else {
-                            output += 'Artist Album\n';
-                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
-                        }
-                    }
-                    else {
-                        if (includeLineNumbers) {
-                            output += `# Artist Album ${SORT_ALBUMS_BY}\n`;
-                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title,true)}\n`;
-                        }
-                        else {
-                            output += `Artist Album ${SORT_ALBUMS_BY}\n`;
-                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
-                        }
-                    }
-                    break;
-                case MEDIA_FORMAT.TRACK:
-                   if (includeLineNumbers) {
-                        output += `# Title Album Artist Album Duration\n`;
-                        for (const title of titles) output += `${++i} ${appendTrackToTxt(title)}\n`;
-                   }
-                   else {
-                    output += `Title Album Artist Album Duration\n`;
-                    for (const title of titles) output += `${appendTrackToTxt(title)}\n`;
-                   }
-                    break;
-                default:
-            }
-            break;
-        case FILE_TYPES.CSV_FILE:
-            switch(MEDIA_TYPE) {
-                case MEDIA_FORMAT.MOVIE:
-                    output += (includeLineNumbers) ? '"#","Title","Year","Duration"\n' : '"Title","Year","Duration"\n';
-                    if (includeLineNumbers) {
-                        for (const title of titles) output += `"${++i}",${appendMovieToCsv(title)}\n`;
-                    }
-                    else {
-                        for (const title of titles) output += `${appendMovieToCsv(title)}\n`;
-                    }
-                    
-                    break;
-                case MEDIA_FORMAT.TV_SHOW:
-                    output += (includeLineNumbers) ? '"#","Title","Year","Seasons","Episode Duration"\n' : '"Title","Year","Seasons","Episode Duration"\n';
-                    if (includeLineNumbers) {
-                        for (const title of titles) output += `"${++i}",${appendTvShowToCsv(title)}\n`;
-                    }
-                    else {
-                        for (const title of titles) output += `${appendTvShowToCsv(title)}\n`;
-                    }
-                    break;
-                case MEDIA_FORMAT.ALBUM:
-                    if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
-                        if (includeLineNumbers) {
-                            output += `"#","Artist","Album"\n`;
-                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title)}\n`;
-                        }
-                        else {
-                            output += '"Artist","Album"\n';
-                            for (const title of titles) output += `${appendAlbumToCsv(title)}\n`;
-                        }
-                    }
-                    else {
-                        if (includeLineNumbers) {
-                            output += `"#","Artist","Album","${SORT_ALBUMS_BY}"\n`;
-                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title,true)}\n`;
-                        }
-                        else {
-                            output += `"Artist","Album","${SORT_ALBUMS_BY}"\n`;
-                            for (const title of titles) output += `${appendAlbumToCsv(title,true)}\n`;
-                        }
-                    }
-                    break;
-                case MEDIA_FORMAT.TRACK:
-                    output += (includeLineNumbers) ? '"#","Title","Album Artist","Album","Duration"\n' : '"Title","Album Artist","Album","Duration"\n';
-                    if (includeLineNumbers) {
-                        for (const title of titles) output += `"${++i}",${appendTrackToCsv(title)}\n`;
-                    }
-                    else {
-                        for (const title of titles) output += `${appendTrackToCsv(title)}\n`;
-                    }
-                    break;
-                default:
-            }
-            break;
-        case FILE_TYPES.JSON_FILE:
-            if (includeLineNumbers) {
-                for (let i = 0; i < titles.length; i++) {
-                    titles[i].id = i+1;
-                }
-            }
-            output += JSON.stringify(titles);
-            break;
-        default:
-    }
-    return output;
-}
-
 const downloadFileHandler = (titles) => async (e) => {
     const fileType = document.getElementById('fileType').value.toLowerCase();
     const sortedTitles = sortTitles(titles);
-    const data = new Blob([stringifyTitles(sortedTitles,fileType)],{type:'text/plain', endings:'native'});
+    const data = new Blob([stringifyTitles(sortedTitles,MEDIA_TYPE,SORT_ALBUMS_BY,fileType)],{type:'text/plain', endings:'native'});
     const anchor = document.createElement('a');
     anchor.href = URL.createObjectURL(data);
     anchor.download = `${MEDIA_TYPE}.${fileType}`;
@@ -413,7 +222,6 @@ const verifyTabIsPlex = async () => {
 }
 
 const verifyDomain = async () => {
-    let response = false;
     try {
         const tabs = await browser.tabs.query({active:true,currentWindow:true});
         const url = tabs[0].url;
@@ -425,7 +233,6 @@ const verifyDomain = async () => {
         if (allowableDomains.some(reg=>reg.test(url))) {
             await setTabId();
             if (isPagePlex(await verifyTabIsPlex())) {
-                response = true;
                 if (await pageChanged()) {
                     removeStorage(tabId);
                 }
@@ -438,33 +245,6 @@ const verifyDomain = async () => {
     } catch(err) {
         console.error(`Error verifying domain: ${err.message}`);
     }
-}
-
-const getStorage = async (id) => {
-    let output = "";
-    try {
-        const data = await browser.storage.session.get();
-        if (data[`${id}`]) output = data[`${id}`];
-    } catch(err) {
-        console.error(`Background Error Getting Storage: ${err.message}`);
-        output = null;
-    }
-    return output;
-}
-const setStorage = async (id, data) => {
-    let success = false;
-    try {
-        const obj = {};
-        obj[`${id}`] = (typeof data === 'string') ? data : JSON.stringify(data);
-        await browser.storage.session.set(obj);
-        success = true;
-    } catch(err) {
-        console.error(`Background Error Setting Storage: ${err.message}`);
-    }
-    return success;
-}
-const removeStorage = async (id) => {
-    await browser.storage.session.remove(`${id}`);
 }
 
 const communicationHandler = async (data, sender) => {

@@ -1,2 +1,11 @@
+/tmp
+
 *.bak
 *.png
+*.log
+
+.env
+.env.development
+.env.production
+.npmrc
+.htaccess

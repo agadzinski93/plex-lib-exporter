@@ -19,8 +19,8 @@ let SORT_ALBUMS_BY = null;
 		SELECTORS
 	} = (await import(src)).GLOBAL_CONSTANTS;
 
-	src = browser.runtime.getURL("./utils/insertions.js");
-	;({insertTvShow,insertMovie,insertAlbum,insertTrack} = (await import(src)).INSERTIONS);
+	src = browser.runtime.getURL("./utils/titleHelpers/insertTitles.js");
+	const {insertTvShow,insertMovie,insertAlbum,insertTrack} = await import(src);
 
 	const setSortAlbumsBy = async () => {
 		const sortOption = document.querySelector(SELECTORS.ALBUM_SORT_TEXT);
@@ -104,21 +104,6 @@ let SORT_ALBUMS_BY = null;
 		}
 		return found;
 	}
-	/**
-	 * 
-	 * @param {object} entry 
-	 * @param {object} prevEntry 
-	 * @returns {boolean}
-	 */
-	const entriesMatch = (entry, prevEntry) => {
-		if (!entry || !prevEntry) return false;
-		if (MEDIA_TYPE === MEDIA_FORMAT.TRACK) {
-			return (entry.children[2].children[0].textContent === prevEntry.children[2].children[0].textContent);
-		}
-		else {
-			return (entry.children[0].children[0].textContent === prevEntry.children[0].children[0].textContent);
-		}
-	}
 
 	const removeObserverMutation = () => {
 		if (OBSERVER) OBSERVER.disconnect();
@@ -134,34 +119,30 @@ let SORT_ALBUMS_BY = null;
 		}
 		const config = {childList:true};
 		const callback = async (mutationList, observer) => {
-			let cells = null;
+			let cell = null;
 			for (const mutation of mutationList) {
 				if (mutation.type === 'childList' && mutation.addedNodes.length === 1) {
 					try {
 						switch(MEDIA_TYPE) {
 							case MEDIA_FORMAT.MOVIE:
-								cells = document.querySelectorAll(SELECTORS.CELLS_MOVIE);
-								for (const cell of cells) {
+								cell = mutation.addedNodes[0]?.children[2]?.children[0]?.children[1];
+								if (cell) {
 									if (!entryExists(cell)) insertMovie(cell);
 								}
 								break;
 							case MEDIA_FORMAT.TV_SHOW:
-								cells = document.querySelectorAll(SELECTORS.CELLS_TV_SHOW);
-								for (const cell of cells) {
+								cell = mutation.addedNodes[0]?.children[2]?.children[0]?.children[1];
+								if (cell) {
 									if (!entryExists(cell)) insertTvShow(cell);
 								}
 								break;
 							case MEDIA_FORMAT.ALBUM:
-								cells = document.querySelectorAll(SELECTORS.CELLS_ALBUM);
-								for (const cell of cells) {
-									if (!entryExists(cell)) insertAlbum(cell);
-								}
+								cell = mutation.addedNodes[0];
+								if (!entryExists(cell)) insertAlbum(cell);
 								break;
 							case MEDIA_FORMAT.TRACK:
-								cells = document.querySelectorAll(SELECTORS.CELLS_TRACK);
-								for (const cell of cells) {
-									if (!entryExists(cell)) insertTrack(cell);
-								}
+								cell = mutation.addedNodes[0];
+								if (!entryExists(cell)) insertTrack(cell);
 								break;
 							default:
 						}
