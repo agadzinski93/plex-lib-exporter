@@ -23,6 +23,8 @@
 			"matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
 			"resources":[
 				"constants/constants.js",
+				"utils/popupHelpers/popupHelpers.js",
+				"utils/popupHelpers/tabHelpers.js",
 				"utils/titleHelpers/appendTitles.js",
 				"utils/titleHelpers/insertTitles.js",
 				"utils/titleHelpers/sortTitles.js",

@@ -6,7 +6,7 @@ const appendMovieToTxt = (entry) => {
 const appendTvShowToTxt = (entry) => {
     return `${entry.title} ${entry.year} ${entry.numOfSeasons} ${entry.avgEpisodeDuration}`;
 }
-const appendAlbumToTxt = (entry, thirdProperty = false) => {
+const appendAlbumToTxt = (entry, SORT_ALBUMS_BY, thirdProperty = false) => {
     if (thirdProperty) {
         let property = SORT_ALBUMS_BY.replaceAll(' ','');
         property = property.charAt(0).toLowerCase() + property.slice(1);
@@ -27,7 +27,7 @@ const appendTvShowToCsv = (entry) => {
     entry.title = escapeDoubleQuotes(entry.title);
     return `"${entry.title}","${entry.year}","${entry.numOfSeasons}","${entry.avgEpisodeDuration}"`;
 }
-const appendAlbumToCsv = (entry, thirdProperty = false) => {
+const appendAlbumToCsv = (entry, SORT_ALBUMS_BY, thirdProperty = false) => {
     if (thirdProperty) {
         let property = SORT_ALBUMS_BY.replaceAll(' ','');
         property = property.charAt(0).toLowerCase() + property.slice(1);

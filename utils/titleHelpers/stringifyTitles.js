@@ -45,21 +45,21 @@ const stringifyTitles = (titles, mediaType, sortAlbumsBy, fileType = FILE_TYPES.
                     if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(sortAlbumsBy)) {
                         if (includeLineNumbers) {
                             output += `# Artist Album\n`;
-                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title)}\n`;
+                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title,sortAlbumsBy)}\n`;
                         }
                         else {
                             output += 'Artist Album\n';
-                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
+                            for (const title of titles) output += `${appendAlbumToTxt(title,sortAlbumsBy)}\n`;
                         }
                     }
                     else {
                         if (includeLineNumbers) {
                             output += `# Artist Album ${sortAlbumsBy}\n`;
-                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title,true)}\n`;
+                            for (const title of titles) output += `${++i} ${appendAlbumToTxt(title,sortAlbumsBy,true)}\n`;
                         }
                         else {
                             output += `Artist Album ${sortAlbumsBy}\n`;
-                            for (const title of titles) output += `${appendAlbumToTxt(title,true)}\n`;
+                            for (const title of titles) output += `${appendAlbumToTxt(title,sortAlbumsBy,true)}\n`;
                         }
                     }
                     break;
@@ -101,21 +101,21 @@ const stringifyTitles = (titles, mediaType, sortAlbumsBy, fileType = FILE_TYPES.
                     if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(sortAlbumsBy)) {
                         if (includeLineNumbers) {
                             output += `"#","Artist","Album"\n`;
-                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title)}\n`;
+                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title,sortAlbumsBy)}\n`;
                         }
                         else {
                             output += '"Artist","Album"\n';
-                            for (const title of titles) output += `${appendAlbumToCsv(title)}\n`;
+                            for (const title of titles) output += `${appendAlbumToCsv(title,sortAlbumsBy)}\n`;
                         }
                     }
                     else {
                         if (includeLineNumbers) {
                             output += `"#","Artist","Album","${sortAlbumsBy}"\n`;
-                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title,true)}\n`;
+                            for (const title of titles) output += `"${++i}",${appendAlbumToCsv(title,sortAlbumsBy,true)}\n`;
                         }
                         else {
                             output += `"Artist","Album","${sortAlbumsBy}"\n`;
-                            for (const title of titles) output += `${appendAlbumToCsv(title,true)}\n`;
+                            for (const title of titles) output += `${appendAlbumToCsv(title,sortAlbumsBy,true)}\n`;
                         }
                     }
                     break;

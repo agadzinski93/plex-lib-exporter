@@ -311,7 +311,7 @@ let SORT_ALBUMS_BY = null;
 		let response = null;
 		switch(data.type) {
 			case TAB_OPTIONS.SET_TAB_ID_IN_CONTENT_SCRIPT:
-				if (!tabId) tabId = data.tabId;
+				if (!tabId) tabId = data.TAB_ID;
 				response = tabId;
 				break;
 			case TAB_OPTIONS.UPDATE_LIST:
