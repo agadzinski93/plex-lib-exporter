@@ -1,3 +1,8 @@
+/**
+ * Retrieve the session data for a particular tab
+ * @param {number} id Tab id
+ * @returns {Promise<string | null>}
+ */
 const getStorage = async (id) => {
     let output = "";
     try {
@@ -9,6 +14,12 @@ const getStorage = async (id) => {
     }
     return output;
 }
+/**
+ * Set the session data for a particular tab. Returns if successful.
+ * @param {number} id Tab id
+ * @param {object} data JSON formatted object of data (e.g. movies, shows, albums)
+ * @returns {Promise<boolean>} Success?
+ */
 const setStorage = async (id, data) => {
     let success = false;
     try {
@@ -21,6 +32,10 @@ const setStorage = async (id, data) => {
     }
     return success;
 }
+/**
+ * Clear the session storage for a particular tab
+ * @param {number} id Tab id
+ */
 const removeStorage = async (id) => {
     await browser.storage.session.remove(`${id}`);
 }

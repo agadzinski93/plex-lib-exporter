@@ -35,9 +35,9 @@ let SORT_ALBUMS_BY = null;
 	}
 	
 	/**
-	 * @param {Array} list
-	 * @param {object} entry
-	 * @returns {boolean}
+	 * Return whether a title already exists in the TITLES_LIST array
+	 * @param {HTMLElement} entry
+	 * @returns {boolean} HTML element containing relevant media information
 	 */
 	const entryExists = (entry) => {
 		let found = false;
@@ -104,11 +104,24 @@ let SORT_ALBUMS_BY = null;
 		}
 		return found;
 	}
-
+	/**
+	 * Disconnect the observer from the container element. This is good when
+	 * the user stacks all the titles (altering the CSS) so we don't trigger
+	 * unnecessary calls to this observer when we can simply scan all titles
+	 * ONCE after updating the CSS.
+	 */
 	const removeObserverMutation = () => {
 		if (OBSERVER) OBSERVER.disconnect();
 	}
-	
+	/**
+	 * Add mutation observer over HTML element containing all titles. As titles
+	 * scroll into view, this observer will add them to the array if it does not
+	 * already exist.
+	 * 
+	 * Plex does NOT load all titles in a library you're viewing. Elements are
+	 * loaded/unloaded into/from the DOM as you scroll. This observer solves
+	 * that problem.
+	 */
 	const addObserverMutation = () => {
 		let targetNode = null;
 		if (MEDIA_TYPE === MEDIA_FORMAT.TRACK) {
@@ -200,7 +213,10 @@ let SORT_ALBUMS_BY = null;
 		}
 		return output;
 	}
-	
+	/**
+	 * Sends a message to the popup to update the session storage for this tab with current TITLES_LIST array
+	 * @returns 
+	 */
 	const updateStorage = async () => {
 		let output = false;
 		try {
@@ -211,11 +227,16 @@ let SORT_ALBUMS_BY = null;
 		}
 		return output;
 	}
-	
+	/**
+	 * Returns a string representation of the total number of titles in a Plex library the user is viewing
+	 * @returns {string}
+	 */
 	const getTotalTitles = () => {
 		return document.querySelector('[class^=PageHeaderLeft-pageHeaderLeft] > span[class^=PageHeaderBadge-badge]')?.textContent;
 	}
-	
+	/**
+	 * If the user checks the 'Stack Titles' checkbox, alter the CSS so all titles appear on screen
+	 */
 	const repositionTitles = () => {
 		removeObserverMutation();
 		chkStackTitlesChecked = true;
@@ -230,7 +251,9 @@ let SORT_ALBUMS_BY = null;
 		document.getElementById('tempStyles').textContent = css;
 		document.querySelector('[class^=DirectoryListPageContent-listContainer] > div:first-child').style.removeProperty('display');
 	}
-	
+	/**
+	 * If the user unchecks the 'Stack Titles' checkbox, revert the CSS so all titles appear normally
+	 */
 	const revertTitles = () => {
 		chkStackTitlesChecked = false;
 		document.getElementById('tempStyles').textContent = '';
@@ -242,7 +265,10 @@ let SORT_ALBUMS_BY = null;
 			addObserverMutation();
 		},250);
 	}
-	
+	/**
+	 * Creates a custom stylesheet that is used for the custom css rules if the user
+	 * chooses to click 'Stack Titles'
+	 */
 	const createStylesheet = () => {
 		if (!document.getElementById('tempStyles')) {
 			const stylesheet = document.createElement('style');
@@ -251,7 +277,9 @@ let SORT_ALBUMS_BY = null;
 			document.getElementsByTagName('head')[0].append(stylesheet);
 		}
 	}
-	
+	/**
+	 * Sends a message to the popup to clear the session storage for this tab
+	 */
 	const clearStorage = async () => {
 		try {
 			if (tabId) await browser.runtime.sendMessage({type:MESSAGE_OPTIONS.REMOVE_STORAGE,id:tabId});

@@ -1,12 +1,21 @@
 import { GLOBAL_CONSTANTS } from "../../constants/constants.js";
 const {TAB_OPTIONS} = GLOBAL_CONSTANTS;
 
+/**
+ * Active tab ID
+ */
 let TAB_ID = null;
 
+/**
+ * Return an array containing only the active tab in browser
+ * @returns 
+ */
 const getCurrentWindowTabs = async () => {
     return await browser.tabs.query({currentWindow:true, active:true});
 }
-
+/**
+ * Set the global variable of TAB_ID to the ID of the currently active tab
+ */
 const setTabId = async () => {
     try {
         const tabs = await getCurrentWindowTabs();

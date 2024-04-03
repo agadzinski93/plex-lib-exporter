@@ -15,6 +15,15 @@ const {
     MEDIA_TYPE:MEDIA_FORMAT
 } = GLOBAL_CONSTANTS;
 
+/**
+ * When prepping the download for the user, stringify the list of title objects, formatting the
+ * string based on the media type (e.g. tv show/movie/album) and the output format (e.g. csv)
+ * @param {object[]} titles Array of objects containing individual titles (e.g. movie, tv show)
+ * @param {string} mediaType Albums, movie, Tracks, or tv (notice some are capitalized)
+ * @param {string} sortAlbumsBy 
+ * @param {string} fileType txt, csv, or json
+ * @returns 
+ */
 const stringifyTitles = (titles, mediaType, sortAlbumsBy, fileType = FILE_TYPES.TXT_FILE) => {
     let output = "";
     const includeLineNumbers = document.getElementById('chkLineNumbers').checked;

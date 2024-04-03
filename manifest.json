@@ -2,19 +2,29 @@
 	"manifest_version":3,
 	"name":"Plex Library Exporter",
 	"version":"0.1.0",
-	"description":"Allows users to export their Plex libraries into TXT, CSV, and JSON files.",
+	"description":"Allows users to export and download their Plex libraries into TXT, CSV, and JSON files. Great for making spreadsheets of your collection!",
+	"background": {
+		"scripts": ["background-script.js"]
+	},
+	"browser_specific_settings": {
+		"gecko": {
+		  "id":"example1161@gmail.com",
+		  "strict_min_version": "123.0"
+		}
+	},	  
 	"content_scripts": [
 		{
 		  "matches": ["*://localhost/*","*://app.plex.tv/*", "*://127.0.0.1/*"],
 		  "js": ["plex-exporter.js"]
 		}
 	],
+	"homepage_url": "https://github.com/agadzinski93/plex-lib-exporter",
 	"permissions": [
 		"storage",
 		"tabs"
 	  ],
 	"action":{
-		"default_icon":"star.png",
+		"default_icon":"/assets/icon-96.png",
 		"default_title":"Plex Library Exporter",
 		"default_popup":"view.html"
 	},

@@ -14,6 +14,11 @@ let fetchAttempts = 0;
 let MEDIA_TYPE = null;
 let SORT_ALBUMS_BY = null;
 
+/**
+ * Calls the createElementTree() function found in domHelpers.js to recursively create
+ * all HTML elements and their attributes related to the download button and the options
+ * above it in the popup.
+ */
 const createDownloadButton = async () => {
     const checked = await chkStackTitlesChecked();
     document.querySelector('main').append(document.createElementTree('div',['textAlignCenter'],{id:'successContainer'},[
@@ -45,7 +50,11 @@ const createDownloadButton = async () => {
     document.getElementById('chkStackTitles').checked = checked;
     if (document.getElementById('tempStyles')?.textContent) document.getElementById('chkStackTitles').checked = true;
 }
-
+/**
+ * Sends message to tab to see if the titles are already stacked. This is used to see if the
+ * 'Stack Titles' checkbox should be checked/not checked when the popup is opened.
+ * @returns
+ */
 const chkStackTitlesChecked = async () => {
     let output = false;
     try {
@@ -56,7 +65,13 @@ const chkStackTitlesChecked = async () => {
     }
     return output;
 }
-
+/**
+ * When downloading the TXT, CSV, or JSON file, create a blob (file) based on the items 
+ * already collected, create a URL object in memory and attach the blob to it, 
+ * and trigger a download of that file
+ * @param {*} titles 
+ * @returns 
+ */
 const downloadFileHandler = (titles) => async (e) => {
     const fileType = document.getElementById('fileType').value.toLowerCase();
     const sortedTitles = sortTitles(titles);
@@ -67,7 +82,11 @@ const downloadFileHandler = (titles) => async (e) => {
     URL.revokeObjectURL(data);
     anchor.click();
 }
-
+/**
+ * When the popup is first opened in a tab, perform the initial scan of titles and
+ * display the number of items found and render the download button.
+ * @param {string} mediaType 
+ */
 const getTitles = async (mediaType) => {
     MEDIA_TYPE = mediaType;
     const header = document.getElementById('header');
@@ -88,7 +107,14 @@ const getTitles = async (mediaType) => {
         header.textContent = `Error: ${err.message}`;
     }
 }
-
+/**
+ * Event function applied to the checkbox 'Stack Titles'
+ * Not all titles will load immediattely after clicking the checkbox.
+ * This function will loop through a number of attempts to see if all titles have loaded,
+ * using a Promise wrapper function called waitForTilesToLoad() before proceeding
+ * or giving up.
+ * @param {*} e 
+ */
 const handleStackingTitles = async (e) => {
     document.getElementById('chkStackTitles').disabled = true;
     const header = document.getElementById('header');
@@ -112,7 +138,11 @@ const handleStackingTitles = async (e) => {
     await updateDownloadButton();
     document.getElementById('chkStackTitles').disabled = false;
 }
-
+/**
+ * Updates the text on the popup each time a new title has been added (e.g. "35 titles found!"").
+ * This will also update the download button.
+ * @returns 
+ */
 const updateDownloadButton = async () => {
     let output = false;
     const header = document.getElementById('header');
@@ -134,8 +164,17 @@ const updateDownloadButton = async () => {
     }
     return output;
 }
-
-const waitForTilesToLoad = (delay, {numOfTitles,checked, fetchAttempts}) => new Promise((resolve, reject)=>{
+/**
+ * When the user selects the 'Stack Titles' option, not all titles will load immediately
+ * and may take longer depending on how many titles are in that library. This Promise
+ * wrapper function will wait until all titles have loaded before updating the popup
+ * text and download button. The number of waits is determined by the calling function
+ * handleStackingTitles()
+ * @param {number} delay Number (in milliseconds) to apply to the setTimeout 
+ * @param {*} param1 
+ * @returns 
+ */
+const waitForTilesToLoad = (delay, {numOfTitles, checked, fetchAttempts}) => new Promise((resolve, reject)=>{
     const header = document.getElementById('header');
 	setTimeout(async ()=>{
 		try {
@@ -179,10 +218,18 @@ const load = async () => {
         console.error(`Error Loading Popup: ${err.message}`);
     }
 }
-
+/**
+ * Sends a message to a tab that the page has been updated. This will set the array of titles
+ * collected on that page back to empty
+ * @returns 
+ */
 const pageChanged = async () => {
     return await browser.tabs.sendMessage(TAB_ID,{type:TAB_OPTIONS.PAGE_CHANGED});
 }
+/**
+ * Updates message displayed on extension popup
+ * @param {string} msg Message text
+ */
 const displayMessage = (msg) => {
     document.getElementById('header').textContent = msg;
 }
@@ -197,6 +244,10 @@ const isPagePlex = (result) => {
     }
     return output;
 }
+/**
+ * If the current tab has a supported URL, check if it is Plex
+ * @returns {boolean | null}
+ */
 const verifyTabIsPlex = async () => {
     let output = null;
     try {
@@ -206,7 +257,11 @@ const verifyTabIsPlex = async () => {
     }
     return output;
 }
-
+/**
+ * When opening the popup, verify that the current tab is of a supported hostname/domain.
+ * If acceptable, continue through other functions, otherwise print an 'Unsupported' message 
+ * on the popup
+ */
 const verifyDomain = async () => {
     try {
         const tabs = await browser.tabs.query({active:true,currentWindow:true});

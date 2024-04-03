@@ -1,6 +1,10 @@
 import { GLOBAL_CONSTANTS } from '../../constants/constants.js';
 const {ALBUM_SORT_OPTIONS} = GLOBAL_CONSTANTS;
 
+/**
+ * Pushes a new TV show into the global object TITLES_LIST containing all shows displayed on page
+ * @param {HTMLElement} entry HTML element containing relevant info on a TV show
+ */
 const insertTvShow = (entry) => {
     TITLES_LIST.push(new Object({
         title:entry.children[0].children[0].textContent,
@@ -9,6 +13,10 @@ const insertTvShow = (entry) => {
         avgEpisodeDuration:(entry.children[1]?.children[4]?.textContent) ? entry.children[1].children[4].textContent : null
     }));
 }
+/**
+ * Pushes a new movie into the global object TITLES_LIST containing all movies displayed on page
+ * @param {HTMLElement} entry HTML element containing relevant info on a movie
+ */
 const insertMovie = (entry) => {
     TITLES_LIST.push(new Object({
         title:entry.children[0].children[0].textContent,
@@ -16,6 +24,10 @@ const insertMovie = (entry) => {
         duration:(entry.children[1]?.children[2]?.textContent) ? entry.children[1].children[2].textContent : null
     }));
 }
+/**
+ * Pushes a new album into the global object TITLES_LIST containing all albums displayed on page
+ * @param {HTMLElement} entry HTML element containing relevant info on a album
+ */
 const insertAlbum = (entry) => {
     if ([ALBUM_SORT_OPTIONS.TITLE,ALBUM_SORT_OPTIONS.ALBUM_ARTIST].includes(SORT_ALBUMS_BY)) {
         TITLES_LIST.push(new Object({
@@ -33,6 +45,10 @@ const insertAlbum = (entry) => {
         }));
     }
 }
+/**
+ * Pushes a new track into the global object TITLES_LIST containing all tracks displayed on page
+ * @param {HTMLElement} entry HTML element containing relevant info on a track
+ */
 const insertTrack = (entry) => {
     TITLES_LIST.push(new Object({
         title:entry.children[2].children[0].textContent,
