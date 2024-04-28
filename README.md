@@ -11,7 +11,7 @@ Currently supported media types:
 Supported hostnames when viewing Plex:
 * localhost
 * 127.0.0.1
-* app.plex.tx
+* app.plex.tv
 
 ## Instructions
 After installing the add-on, open Plex in your browser using a supported hostname as seen above. Click on a library of your choice on the far left.
@@ -22,7 +22,7 @@ After installing the add-on, open Plex in your browser using a supported hostnam
 3. Websites/web apps typically use the character encoding UTF-8 by default. This is typically no problem for the English-speaking world as our character encodings are identical whether it's UTF-8, ASCII, or ANSI. However, some titles may use foreign symbols that may be incompatible with the encoding used by your spreadsheet software. Excel uses ANSI which messes up some music I have that use Asian characters. The solution, for Excel at least, is to use the "Get Data From Text" wizard and choose a UTF-8 variant that supports Asian languages (this will not affect your English titles because English encodings are consistent among all UTF-8 variants).
 
 ### How to Collect all the Titles?
-Since all HTML elements are not loaded onto the page, the extesnion cannot grab all info without doing one of the two options below:
+Since all HTML elements are not loaded onto the page, the extension cannot grab all info without doing one of the two options below:
 
 1. Click the *Stack Titles* checkbox. This will adjust the CSS styling rules on the page, causing all titles to appear on top of each other. The extesnion will be able to gather all info. You can then uncheck the box to return the page to normal.
 

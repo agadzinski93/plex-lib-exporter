@@ -1,9 +1,12 @@
 /assets
 /tmp
+**/node_modules
+**/dist
+**/notes.txt
+**/*.log
 
 *.bak
 *.png
-*.log
 
 .env
 .env.development
