@@ -1,4 +1,4 @@
-import { GLOBAL_CONSTANTS } from "../../constants/constants.js";
+import { GLOBAL_CONSTANTS } from "../../firefox/constants/constants.js";
 const {TAB_OPTIONS} = GLOBAL_CONSTANTS;
 
 /**

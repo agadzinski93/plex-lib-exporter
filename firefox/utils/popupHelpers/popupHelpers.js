@@ -1,4 +1,4 @@
-import { GLOBAL_CONSTANTS } from "../../constants/constants.js";
+import { GLOBAL_CONSTANTS } from "../../firefox/constants/constants.js";
 import { sortTitles } from "../titleHelpers/sortTitles.js";
 import { stringifyTitles } from "../titleHelpers/stringifyTitles.js";
 import { getStorage,setStorage,removeStorage } from "../storage.js";

@@ -8,7 +8,7 @@ const addDomHelpers = () => {
      * @param {Array} classes Array of strings representing classes to give element
      * @param {Object} attributes Object of properties and values to give element (e.g. {href:'url'})
      * @param {Array} children Array of additional elements to append to element using same args structure as this func (array of arrays)
-     * @param {string} text innerHTML text (this will allow HTML entities)
+     * @param {string} text textContent (this will allow HTML entities)
      * @returns 
      */
     document.createElementTree = function(element,classes = [],attributes = null, children = null, text = null){

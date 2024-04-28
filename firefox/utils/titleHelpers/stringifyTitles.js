@@ -1,4 +1,4 @@
-import { GLOBAL_CONSTANTS } from "../../constants/constants.js";
+import { GLOBAL_CONSTANTS } from "../../firefox/constants/constants.js";
 import { 
     appendAlbumToCsv,
     appendAlbumToTxt,
