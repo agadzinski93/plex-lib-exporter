@@ -12,7 +12,7 @@ app.use(express.json());
 
 app.use('/api/v1', apiRouter);
 
-app.get('/_health', (req, res, next) => res.send('<h1>Application is running!</h1>'));
+app.get('/_health', (req, res, next) => res.send('<h1>App is running!</h1>'));
 
 app.use((err: AppError, req: Request, res: Response, next: NextFunction): void => {
     const status = err.status || 500;
