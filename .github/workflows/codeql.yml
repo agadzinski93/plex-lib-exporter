@@ -2,12 +2,8 @@ name: "CodeQL"
 on:
   push:
     branches: [ "**" ]
-    paths:
-        - api
   pull_request:
     branches: [ "**" ]
-    paths:
-        - api
 jobs:
   analyze:
     name: Analyze

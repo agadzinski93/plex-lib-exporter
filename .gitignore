@@ -5,6 +5,8 @@
 **/notes.txt
 **/*.log
 
+deployPle.sh
+
 *.bak
 *.png
 

@@ -1,0 +1,17 @@
+name: deployment
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to cPanel
+        uses: pinkasey/cpanel-deploy-action@v1.2.0
+        with:
+          hostname: "${{ secrets.CPANEL_HOSTNAME }}"
+          repository_root: "${{ secrets.CPANEL_REPO_ROOT }}"
+          branch: "${{ github.ref_name }}"
+          cpanel_username: "${{ secrets.CPANEL_USERNAME }}"
+          cpanel_token: "${{ secrets.CPANEL_TOKEN }}"
